@@ -32,7 +32,7 @@ database:
 
 test:
     override:
-        - nosetests --ckan --reset-db --with-pylons=test-core.ini --nologcapture --with-coverage ckan ckanext
+        - nosetests --ckan --reset-db --with-pylons=test-core.ini --nologcapture --with-coverage --cover-package=ckan --cover-package=ckanext ckan ckanext
 
     post:
         - paster serve test-core.ini:
