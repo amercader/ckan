@@ -4,6 +4,8 @@ machine:
         PIP_USE_MIRRORS: true
 
 dependencies:
+    cache_directories:
+        - "~/nvm"
     override:
         - pip install -r requirements.txt --allow-all-external
         - pip install -r dev-requirements.txt --allow-all-external
