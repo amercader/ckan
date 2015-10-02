@@ -29,13 +29,11 @@ database:
         - paster db init -c test-core.ini
 
 test:
-    pre:
-        # This will be used by the Mocha tests
-        - paster serve test-core.ini:
-            background: true
-
     override:
         - nosetests --ckan --reset-db --with-pylons=test-core.ini --nologcapture --with-coverage ckan ckanext
 
     post:
+        - paster serve test-core.ini:
+            background: true
+        - sleep 5
         - mocha-phantomjs http://localhost:5000/base/test/index.html
