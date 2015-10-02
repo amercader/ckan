@@ -18,6 +18,8 @@ database:
         - sudo -u postgres psql -c "CREATE USER datastore_default WITH PASSWORD 'pass';"
         - sudo -u postgres psql -c 'CREATE DATABASE ckan_test WITH OWNER ckan_default;'
         - sudo -u postgres psql -c 'CREATE DATABASE datastore_test WITH OWNER ckan_default;'
+        - sed -i -e 's/.*datastore.read_url.*/ckan.datastore.read_url = postgresql:\/\/datastore_default:pass@\/datastore_test/' test-core.ini
+        - paster datastore -c test-core.ini set-permissions | sudo -u postgres psql
 
         - cp -R /opt/solr-4.3.1 $HOME/solr
         - cp ckan/config/solr/schema.xml $HOME/solr/example/solr/collection1/conf
