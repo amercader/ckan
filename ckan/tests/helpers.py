@@ -22,15 +22,12 @@ This module is reserved for these very useful functions.
 
 import collections
 import contextlib
-import errno
 import functools
 import logging
-import os
 import re
 
 import webtest
 import nose.tools
-from nose.tools import assert_in, assert_not_in
 import mock
 import rq
 
@@ -179,7 +176,8 @@ class FunctionalTestBase(object):
     Allows configuration changes by overriding _apply_config_changes and
     resetting the CKAN config after your test class has run. It creates a
     webtest.TestApp at self.app for your class to use to make HTTP requests
-    to the CKAN web UI or API.
+    to the CKAN web UI or API. Also loads plugins defined by
+    _load_plugins in the class definition.
 
     If you're overriding methods that this class provides, like setup_class()
     and teardown_class(), make sure to use super() to call this class's methods
@@ -196,10 +194,13 @@ class FunctionalTestBase(object):
 
     @classmethod
     def setup_class(cls):
+        import ckan.plugins as p
         # Make a copy of the Pylons config, so we can restore it in teardown.
         cls._original_config = dict(config)
         cls._apply_config_changes(config)
         cls._get_test_app()
+        for plugin in getattr(cls, '_load_plugins', []):
+            p.load(plugin)
 
     @classmethod
     def _apply_config_changes(cls, cfg):
@@ -214,6 +215,9 @@ class FunctionalTestBase(object):
 
     @classmethod
     def teardown_class(cls):
+        import ckan.plugins as p
+        for plugin in reversed(getattr(cls, '_load_plugins', [])):
+            p.unload(plugin)
         # Restore the Pylons config to its original values, in case any tests
         # changed any config settings.
         config.clear()
@@ -289,7 +293,7 @@ def webtest_submit(form, name=None, index=None, value=None, **args):
     '''
     fields = webtest_submit_fields(form, name, index=index, submit_value=value)
     if form.method.upper() != "GET":
-        args.setdefault("content_type",  form.enctype)
+        args.setdefault("content_type", form.enctype)
     return form.response.goto(form.action, method=form.method,
                               params=fields, **args)
 

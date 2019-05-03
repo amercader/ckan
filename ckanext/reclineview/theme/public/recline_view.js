@@ -11,7 +11,7 @@ this.ckan.module('recline_view', function (jQuery) {
       this.options.resourceView = JSON.parse(this.options.resourceView);
       this.el.ready(this._onReady);
       // hack to make leaflet use a particular location to look for images
-      L.Icon.Default.imagePath = this.options.site_url + 'vendor/leaflet/0.7.3/images';
+      L.Icon.Default.imagePath = this.options.site_url + 'vendor/leaflet/0.7.7/images';
     },
 
     _onReady: function() {
@@ -116,7 +116,7 @@ this.ckan.module('recline_view', function (jQuery) {
           state.lonField = reclineView.longitude_field;
         }
 
-        view = new recline.View.Map(this._reclineMapViewOptions(dataset, this.options.map_config));
+        view = new recline.View.Map($.extend(this._reclineMapViewOptions(dataset, this.options.map_config), {state:state}));
       } else if(reclineView.view_type === "recline_view") {
         view = this._newDataExplorer(dataset, this.options.map_config);
       } else {

@@ -1,11 +1,8 @@
 # encoding: utf-8
 
-from sqlalchemy import MetaData, __version__ as sqav
-from nose.tools import assert_equal, raises
+from nose.tools import assert_equal
 
-from ckan.tests.legacy import *
 import ckan.model as model
-from ckan.lib.create_test_data import CreateTestData
 
 
 class TestResource:
@@ -122,7 +119,7 @@ class TestResource:
         assert len(pkg.resources_all) == 3, len(pkg.resources)
         lastres = pkg.resources[2]
         assert lastres.position == 2, lastres
-        print lastres
+        print(lastres)
         assert lastres.url == self.urls[0], (self.urls, lastres.url)
 
 
@@ -169,5 +166,3 @@ class TestResource:
         all_resources = model.Session.query(model.Resource).\
                         filter_by(state=model.State.ACTIVE).all()
         assert len(all_resources) == 0, pkg.resources
-
-

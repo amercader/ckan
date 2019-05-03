@@ -1,4 +1,4 @@
-/* Image Upload
+ /* Image Upload
  *
  */
 this.ckan.module('image-upload', function($) {
@@ -35,8 +35,8 @@ this.ckan.module('image-upload', function($) {
       var field_name = 'input[name="' + options.field_name + '"]';
 
       this.input = $(field_upload, this.el);
-      this.field_url = $(field_url, this.el).parents('.control-group');
-      this.field_image = this.input.parents('.control-group');
+      this.field_url = $(field_url, this.el).parents('.form-group');
+      this.field_image = this.input.parents('.form-group');
       this.field_url_input = $('input', this.field_url);
       this.field_name = this.el.parents('form').find(field_name);
       // this is the location for the upload/link data/image label
@@ -47,24 +47,24 @@ this.ckan.module('image-upload', function($) {
       // Is there a clear checkbox on the form already?
       var checkbox = $(field_clear, this.el);
       if (checkbox.length > 0) {
-        checkbox.parents('.control-group').remove();
+        checkbox.parents('.form-group').remove();
       }
 
       // Adds the hidden clear input to the form
-      this.field_clear = $('<input type="hidden" name="clear_upload">')
+      this.field_clear = $('<input type="hidden" name="' + options.field_clear +'">')
         .appendTo(this.el);
 
       // Button to set the field to be a URL
-      this.button_url = $('<a href="javascript:;" class="btn">' +
-                          '<i class="icon-globe"></i>' +
+      this.button_url = $('<a href="javascript:;" class="btn btn-default">' +
+                          '<i class="fa fa-globe"></i>' +
                           this._('Link') + '</a>')
         .prop('title', this._('Link to a URL on the internet (you can also link to an API)'))
         .on('click', this._onFromWeb)
         .insertAfter(this.input);
 
       // Button to attach local file to the form
-      this.button_upload = $('<a href="javascript:;" class="btn">' +
-                             '<i class="icon-cloud-upload"></i>' +
+      this.button_upload = $('<a href="javascript:;" class="btn btn-default">' +
+                             '<i class="fa fa-cloud-upload"></i>' +
                              this._('Upload') + '</a>')
         .insertAfter(this.input);
 
@@ -129,6 +129,11 @@ this.ckan.module('image-upload', function($) {
      * Returns String.
      */
     _fileNameFromUpload: function(url) {
+      // If it's a local CKAN image return the entire URL.
+      if (/^\/base\/images/.test(url)) {
+        return url;
+      }
+
       // remove fragment (#)
       url = url.substring(0, (url.indexOf("#") === -1) ? url.length : url.indexOf("#"));
       // remove query string

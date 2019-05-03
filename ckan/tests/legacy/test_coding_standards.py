@@ -292,7 +292,6 @@ class TestImportStar(object):
         'ckan/migration/versions/064_add_email_last_sent_column.py',
         'ckan/migration/versions/065_add_email_notifications_preference.py',
         'ckan/plugins/__init__.py',
-        'ckan/tests/legacy/functional/api/base.py',
         'ckan/tests/legacy/functional/api/test_api.py',
         'ckan/tests/legacy/functional/api/test_misc.py',
         'ckan/tests/legacy/functional/api/test_package_search.py',
@@ -310,12 +309,8 @@ class TestImportStar(object):
         'ckan/tests/legacy/models/test_extras.py',
         'ckan/tests/legacy/models/test_misc.py',
         'ckan/tests/legacy/models/test_package.py',
-        'ckan/tests/legacy/models/test_package_relationships.py',
         'ckan/tests/legacy/models/test_purge_revision.py',
-        'ckan/tests/legacy/models/test_resource.py',
-        'ckan/tests/legacy/models/test_revision.py',
         'ckan/tests/legacy/models/test_user.py',
-        'ckan/tests/legacy/pylons_controller.py',
         'fabfile.py',
     ]
     fails = {}
@@ -378,9 +373,6 @@ class TestPep8(object):
         'ckan/controllers/revision.py',
         'ckan/include/rcssmin.py',
         'ckan/include/rjsmin.py',
-        'ckan/lib/activity_streams.py',
-        'ckan/lib/activity_streams_session_extension.py',
-        'ckan/lib/alphabet_paginate.py',
         'ckan/lib/app_globals.py',
         'ckan/lib/captcha.py',
         'ckan/lib/cli.py',
@@ -520,7 +512,6 @@ class TestPep8(object):
         'ckan/tests/legacy/ckantestplugins.py',
         'ckan/tests/legacy/functional/api/base.py',
         'ckan/tests/legacy/functional/api/model/test_group.py',
-        'ckan/tests/legacy/functional/api/model/test_licenses.py',
         'ckan/tests/legacy/functional/api/model/test_package.py',
         'ckan/tests/legacy/functional/api/model/test_ratings.py',
         'ckan/tests/legacy/functional/api/model/test_relationships.py',
@@ -553,6 +544,7 @@ class TestPep8(object):
         'ckan/tests/legacy/functional/test_search.py',
         'ckan/tests/legacy/functional/test_tag.py',
         'ckan/tests/legacy/functional/test_tag_vocab.py',
+        'ckan/tests/legacy/functional/test_tracking.py',
         'ckan/tests/legacy/functional/test_upload.py',
         'ckan/tests/legacy/functional/test_user.py',
         'ckan/tests/legacy/html_check.py',
@@ -588,18 +580,15 @@ class TestPep8(object):
         'ckan/tests/legacy/models/test_package.py',
         'ckan/tests/legacy/models/test_package_relationships.py',
         'ckan/tests/legacy/models/test_purge_revision.py',
-        'ckan/tests/legacy/models/test_resource.py',
-        'ckan/tests/legacy/models/test_revision.py',
         'ckan/tests/legacy/models/test_user.py',
         'ckan/tests/legacy/monkey.py',
-        'ckan/tests/legacy/pylons_controller.py',
         'ckan/tests/legacy/schema/test_schema.py',
         'ckan/tests/legacy/test_plugins.py',
         'ckan/tests/legacy/test_versions.py',
+        'ckan/tests/migration/test_revision_legacy_code.py',
         'ckan/websetup.py',
         'ckanext/datastore/bin/datastore_setup.py',
         'ckanext/datastore/logic/action.py',
-        'ckanext/datastore/plugin.py',
         'ckanext/datastore/tests/test_create.py',
         'ckanext/datastore/tests/test_search.py',
         'ckanext/datastore/tests/test_upsert.py',
@@ -610,7 +599,6 @@ class TestPep8(object):
         'ckanext/stats/controller.py',
         'ckanext/stats/plugin.py',
         'ckanext/stats/stats.py',
-        'ckanext/stats/tests/__init__.py',
         'ckanext/stats/tests/test_stats_lib.py',
         'ckanext/stats/tests/test_stats_plugin.py',
         'ckanext/test_tag_vocab_plugin.py',
@@ -619,6 +607,8 @@ class TestPep8(object):
         'fabfile.py',
         'profile_tests.py',
         'setup.py',
+        'ckan/tests/legacy/models/test_resource.py',
+        'ckan/tests/legacy/models/test_revision.py',
     ]
     fails = {}
     passes = []
@@ -653,12 +643,18 @@ class TestPep8(object):
     def find_pep8_errors(cls, filename=None, lines=None):
         try:
             sys.stdout = cStringIO.StringIO()
-            config = {}
+            config = {'ignore': [
+                # W503/W504 - breaking before/after binary operators is agreed
+                # to not be a concern and was changed to be ignored by default.
+                # However we overwrite the ignore list here, so add it back in.
+                # See: https://github.com/PyCQA/pycodestyle/issues/498
+                'W503', 'W504',
+            ]}
 
             # Ignore long lines on test files, as the test names can get long
             # when following our test naming standards.
             if cls._is_test(filename):
-                config['ignore'] = ['E501']
+                config['ignore'].append('E501')
 
             checker = pycodestyle.Checker(filename=filename, lines=lines,
                                           **config)
@@ -678,7 +674,7 @@ class TestPep8(object):
 
     @classmethod
     def _is_test(cls, filename):
-        return bool(re.search('(^|\W)test_.*\.py$', filename, re.IGNORECASE))
+        return bool(re.search(r'(^|\W)test_.*\.py$', filename, re.IGNORECASE))
 
 
 class TestActionAuth(object):
@@ -695,42 +691,28 @@ class TestActionAuth(object):
         'create: follow_dataset',
         'create: follow_group',
         'create: follow_user',
-        'create: package_relationship_create_rest',
-        'delete: package_relationship_delete_rest',
         'delete: unfollow_dataset',
         'delete: unfollow_group',
         'delete: unfollow_user',
-        'get: activity_detail_list',
         'get: am_following_dataset',
         'get: am_following_group',
         'get: am_following_user',
-        'get: dashboard_activity_list_html',
         'get: dataset_followee_count',
         'get: dataset_follower_count',
         'get: followee_count',
-        'get: group_activity_list',
-        'get: group_activity_list_html',
         'get: group_followee_count',
         'get: group_follower_count',
         'get: group_package_show',
         'get: member_list',
-        'get: organization_activity_list',
-        'get: organization_activity_list_html',
         'get: organization_follower_count',
-        'get: package_activity_list',
-        'get: package_activity_list_html',
         'get: recently_changed_packages_activity_list',
-        'get: recently_changed_packages_activity_list_html',
         'get: resource_search',
         'get: roles_show',
         'get: status_show',
         'get: tag_search',
         'get: term_translation_show',
-        'get: user_activity_list',
-        'get: user_activity_list_html',
         'get: user_followee_count',
         'get: user_follower_count',
-        'update: package_relationship_update_rest',
         'update: task_status_update_many',
         'update: term_translation_update_many',
     ]
@@ -739,7 +721,7 @@ class TestActionAuth(object):
         'create: file_upload',
         'delete: revision_delete',
         'delete: revision_undelete',
-        'get: group_autocomplete',
+        'get: activity_list',
         'get: group_list_available',
         'get: sysadmin',
         'get: request_reset',
@@ -751,17 +733,7 @@ class TestActionAuth(object):
     ]
 
     ACTION_NO_DOC_STR_BLACKLIST = [
-        'create: group_create_rest',
-        'create: package_create_rest',
-        'create: package_relationship_create_rest',
-        'delete: package_relationship_delete_rest',
         'get: get_site_user',
-        'get: group_show_rest',
-        'get: package_show_rest',
-        'get: tag_show_rest',
-        'update: group_update_rest',
-        'update: package_relationship_update_rest',
-        'update: package_update_rest',
     ]
 
     done = False
@@ -854,7 +826,6 @@ class TestBadExceptions(object):
     # and so should be translated.
 
     NASTY_EXCEPTION_BLACKLIST_FILES = [
-        'ckan/controllers/api.py',
         'ckan/controllers/user.py',
         'ckan/lib/mailer.py',
         'ckan/logic/action/create.py',

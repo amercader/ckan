@@ -1,32 +1,26 @@
 # encoding: utf-8
 
-import re
 import json
-import urllib
 from pprint import pprint
 from nose.tools import assert_equal, assert_raises
-from nose.plugins.skip import SkipTest
 from ckan.common import config
-import datetime
-import mock
 
-import vdm.sqlalchemy
 import ckan
 from ckan.lib.create_test_data import CreateTestData
 from ckan.lib.dictization.model_dictize import resource_dictize
 import ckan.model as model
 import ckan.tests.legacy as tests
 from ckan.tests.legacy import WsgiAppCase
-from ckan.tests.legacy.functional.api import assert_dicts_equal_ignoring_ordering
 from ckan.tests.legacy import setup_test_search_index
 from ckan.tests.legacy import StatusCodes
 from ckan.logic import get_action, NotAuthorized
 from ckan.logic.action import get_domain_object
 from ckan.tests.legacy import call_action_api
 import ckan.lib.search as search
+import ckan.tests.helpers as helpers
 
-from ckan import plugins
 from ckan.plugins import SingletonPlugin, implements, IPackageController
+
 
 class TestAction(WsgiAppCase):
 
@@ -80,7 +74,7 @@ class TestAction(WsgiAppCase):
         assert len(res['result']) == 1
         assert 'warandpeace' in res['result'] or 'annakarenina' in res['result']
 
-		# Test GET request
+        # Test GET request
         res = json.loads(self.app.get('/api/action/package_list').body)
         assert len(res['result']) == 2
         assert 'warandpeace' in res['result']
@@ -114,10 +108,10 @@ class TestAction(WsgiAppCase):
         assert 'warandpeace' in res
         assert 'annakarenina' in res
         assert 'public_dataset' in res
-        assert not 'private_dataset' in res
+        assert 'private_dataset' not in res
 
     def test_02_package_autocomplete_match_name(self):
-        postparams = '%s=1' % json.dumps({'q':'war', 'limit': 5})
+        postparams = '%s=1' % json.dumps({'q': 'war', 'limit': 5})
         res = self.app.post('/api/action/package_autocomplete', params=postparams)
         res_obj = json.loads(res.body)
         assert_equal(res_obj['success'], True)
@@ -128,7 +122,7 @@ class TestAction(WsgiAppCase):
         assert_equal(res_obj['result'][0]['match_displayed'], 'warandpeace')
 
     def test_02_package_autocomplete_match_title(self):
-        postparams = '%s=1' % json.dumps({'q':'a%20w', 'limit': 5})
+        postparams = '%s=1' % json.dumps({'q': 'won', 'limit': 5})
         res = self.app.post('/api/action/package_autocomplete', params=postparams)
         res_obj = json.loads(res.body)
         assert_equal(res_obj['success'], True)
@@ -137,58 +131,6 @@ class TestAction(WsgiAppCase):
         assert_equal(res_obj['result'][0]['title'], 'A Wonderful Story')
         assert_equal(res_obj['result'][0]['match_field'], 'title')
         assert_equal(res_obj['result'][0]['match_displayed'], 'A Wonderful Story (warandpeace)')
-
-    def test_03_create_update_package(self):
-
-        package = {
-            'author': None,
-            'author_email': None,
-            'extras': [{'key': u'original media','value': u'"book"'}],
-            'license_id': u'other-open',
-            'maintainer': None,
-            'maintainer_email': None,
-            'name': u'annakareninanew',
-            'notes': u'Some test now',
-            'resources': [{'alt_url': u'alt123',
-                           'description': u'Full text.',
-                           'extras': {u'alt_url': u'alt123', u'size': u'123'},
-                           'format': u'plain text',
-                           'hash': u'abc123',
-                           'position': 0,
-                           'url': u'http://datahub.io/download/'},
-                          {'alt_url': u'alt345',
-                           'description': u'Index of the novel',
-                           'extras': {u'alt_url': u'alt345', u'size': u'345'},
-                           'format': u'JSON',
-                           'hash': u'def456',
-                           'position': 1,
-                           'url': u'http://datahub.io/index.json'}],
-            'tags': [{'name': u'russian'}, {'name': u'tolstoy'}],
-            'title': u'A Novel By Tolstoy',
-            'url': u'http://datahub.io',
-            'version': u'0.7a'
-        }
-
-        wee = json.dumps(package)
-        postparams = '%s=1' % json.dumps(package)
-        res = self.app.post('/api/action/package_create', params=postparams,
-                            extra_environ={'Authorization': str(self.sysadmin_user.apikey)})
-        package_created = json.loads(res.body)['result']
-        print package_created
-        package_created['name'] = 'moo'
-        postparams = '%s=1' % json.dumps(package_created)
-        res = self.app.post('/api/action/package_update', params=postparams,
-                            extra_environ={'Authorization': str(self.sysadmin_user.apikey)})
-
-        package_updated = json.loads(res.body)['result']
-        package_updated.pop('revision_id')
-        package_updated.pop('metadata_created')
-        package_updated.pop('metadata_modified')
-
-        package_created.pop('revision_id')
-        package_created.pop('metadata_created')
-        package_created.pop('metadata_modified')
-        assert package_updated == package_created#, (pformat(json.loads(res.body)), pformat(package_created['result']))
 
     def test_03_create_private_package(self):
 
@@ -249,29 +191,6 @@ class TestAction(WsgiAppCase):
                                               **package_dict)
         assert package_created_private['private'] is True
 
-
-    def test_18_create_package_not_authorized(self):
-        # I cannot understand the logic on this one we seem to be user
-        # tester but no idea how.
-        raise SkipTest
-
-        package = {
-            'extras': [{'key': u'original media','value': u'"book"'}],
-            'license_id': u'other-open',
-            'maintainer': None,
-            'maintainer_email': None,
-            'name': u'annakareninanew_not_authorized',
-            'notes': u'Some test now',
-            'tags': [{'name': u'russian'}, {'name': u'tolstoy'}],
-            'title': u'A Novel By Tolstoy',
-            'url': u'http://datahub.io',
-        }
-
-        wee = json.dumps(package)
-        postparams = '%s=1' % json.dumps(package)
-        res = self.app.post('/api/action/package_create', params=postparams,
-                                     status=StatusCodes.STATUS_403_ACCESS_DENIED)
-
     def test_41_create_resource(self):
 
         anna_id = model.Package.by_name(u'annakarenina').id
@@ -329,8 +248,8 @@ class TestAction(WsgiAppCase):
         res_obj = json.loads(res.body)
         assert "/api/3/action/help_show?name=user_create" in res_obj['help']
         assert res_obj['success'] is False
-        assert res_obj['error'] == { '__type': 'Validation Error',
-                'password': ['Your password must be 4 characters or longer']}
+        assert_equal(res_obj['error'], { '__type': 'Validation Error',
+                'password': ['Your password must be 8 characters or longer']})
 
     def test_12_user_update(self):
         normal_user_dict = {'id': self.normal_user.id,
@@ -493,45 +412,6 @@ class TestAction(WsgiAppCase):
                             status=400)
         res_obj = json.loads(res.body)
         assert_equal(res_obj, u'Bad request - Action name not known: bad_action_name')
-
-    def test_19_update_resource(self):
-        package = {
-            'name': u'annakareninanew',
-            'resources': [{
-                'alt_url': u'alt123',
-                'description': u'Full text.',
-                'extras': {u'alt_url': u'alt123', u'size': u'123'},
-                'format': u'plain text',
-                'hash': u'abc123',
-                'position': 0,
-                'url': u'http://datahub.io/download/'
-            }],
-            'title': u'A Novel By Tolstoy',
-            'url': u'http://datahub.io',
-        }
-
-        postparams = '%s=1' % json.dumps(package)
-        res = self.app.post('/api/action/package_create', params=postparams,
-                            extra_environ={'Authorization': str(self.sysadmin_user.apikey)})
-        package_created = json.loads(res.body)['result']
-
-        resource_created = package_created['resources'][0]
-        new_resource_url = u'http://www.annakareinanew.com/download/'
-        resource_created['url'] = new_resource_url
-        postparams = '%s=1' % json.dumps(resource_created)
-        res = self.app.post('/api/action/resource_update', params=postparams,
-                            extra_environ={'Authorization': str(self.sysadmin_user.apikey)})
-
-        resource_updated = json.loads(res.body)['result']
-        assert resource_updated['url'] == new_resource_url, resource_updated
-
-        resource_updated.pop('url')
-        resource_updated.pop('revision_id')
-        resource_updated.pop('revision_timestamp', None)
-        resource_created.pop('url')
-        resource_created.pop('revision_id')
-        resource_created.pop('revision_timestamp', None)
-        assert_equal(resource_updated, resource_created)
 
     def test_20_task_status_update(self):
         package_created = self._add_basic_package(u'test_task_status_update')
@@ -758,7 +638,7 @@ class TestAction(WsgiAppCase):
         postparams = '=1'
         res = self.app.post('/api/action/package_list', params=postparams,
                             status=400)
-        assert "Bad request - Bad request data: Request data JSON decoded to '' but it needs to be a dictionary." in res.body, res.body
+        assert "Bad request - JSON Error: Error decoding JSON data." in res.body, res.body
 
     def test_32_get_domain_object(self):
         anna = model.Package.by_name(u'annakarenina')
@@ -767,32 +647,6 @@ class TestAction(WsgiAppCase):
         group = model.Group.by_name(u'david')
         assert_equal(get_domain_object(model, group.name).name, group.name)
         assert_equal(get_domain_object(model, group.id).name, group.name)
-
-    def test_40_task_resource_status(self):
-
-        try:
-            import ckan.lib.celery_app as celery_app
-        except ImportError:
-            raise SkipTest('celery not installed')
-
-        backend = celery_app.celery.backend
-        ##This creates the database tables as a side effect, can not see another way
-        ##to make tables unless you actually create a task.
-        celery_result_session = backend.ResultSession()
-
-        ## need to do inserts as setting up an embedded celery is too much for these tests
-        model.Session.connection().execute(
-            '''INSERT INTO task_status (id, entity_id, entity_type, task_type, key, value, state, error, last_updated) VALUES ('5753adae-cd0d-4327-915d-edd832d1c9a3', '749cdcf2-3fc8-44ae-aed0-5eff8cc5032c', 'resource', 'qa', 'celery_task_id', '51f2105d-85b1-4393-b821-ac11475919d9', NULL, '', '2012-04-20 21:32:45.553986');
-            '''
-        )
-        model.Session.commit()
-        res = json.loads(self.app.post('/api/action/resource_status_show',
-                            params=json.dumps({'id': '749cdcf2-3fc8-44ae-aed0-5eff8cc5032c'}),
-                            status=200).body)
-
-        assert "/api/3/action/help_show?name=resource_status_show" in res['help']
-        assert res['success'] is True
-        assert res['result'] == [{"status": None, "entity_id": "749cdcf2-3fc8-44ae-aed0-5eff8cc5032c", "task_type": "qa", "last_updated": "2012-04-20T21:32:45.553986", "date_done": None, "entity_type": "resource", "traceback": None, "value": "51f2105d-85b1-4393-b821-ac11475919d9", "state": None, "key": "celery_task_id", "error": "", "id": "5753adae-cd0d-4327-915d-edd832d1c9a3"}], res['result']
 
     def test_41_missing_action(self):
         try:
@@ -848,7 +702,7 @@ class TestAction(WsgiAppCase):
         # There shouldn't be any results.  If the '%' character wasn't
         # escaped correctly, then the search would match because of the
         # unescaped wildcard.
-        assert count is 0
+        assert count == 0
 
     def test_42_resource_search_fields_parameter_still_accepted(self):
         '''The fields parameter is deprecated, but check it still works.
@@ -888,12 +742,10 @@ class TestAction(WsgiAppCase):
             assert "json" in resource['format'].lower()
 
     def test_package_create_duplicate_extras_error(self):
-        import paste.fixture
-        import pylons.test
 
         # Posting a dataset dict to package_create containing two extras dicts
         # with the same key, should return a Validation Error.
-        app = paste.fixture.TestApp(pylons.test.pylonsapp)
+        app = helpers._get_test_app()
         error = call_action_api(app, 'package_create',
                 apikey=self.sysadmin_user.apikey, status=409,
                 name='foobar', extras=[{'key': 'foo', 'value': 'bar'},
@@ -902,10 +754,8 @@ class TestAction(WsgiAppCase):
         assert error['extras_validation'] == ['Duplicate key "foo"']
 
     def test_package_update_remove_org_error(self):
-        import paste.fixture
-        import pylons.test
 
-        app = paste.fixture.TestApp(pylons.test.pylonsapp)
+        app = helpers._get_test_app()
         org = call_action_api(app, 'organization_create',
                 apikey=self.sysadmin_user.apikey, name='myorganization')
         package = call_action_api(app, 'package_create',
@@ -918,11 +768,9 @@ class TestAction(WsgiAppCase):
         assert not res['owner_org'], res['owner_org']
 
     def test_package_update_duplicate_extras_error(self):
-        import paste.fixture
-        import pylons.test
 
         # We need to create a package first, so that we can update it.
-        app = paste.fixture.TestApp(pylons.test.pylonsapp)
+        app = helpers._get_test_app()
         package = call_action_api(app, 'package_create',
                 apikey=self.sysadmin_user.apikey, name='foobar')
 
@@ -1347,4 +1195,4 @@ class TestMember(WsgiAppCase):
         groups = user.get_groups(group.type, role)
         group_ids = [g.id for g in groups]
         assert res['success'] is True, res
-        assert group.id in group_ids, (group, user_groups)
+        assert group.id in group_ids, (group, group_ids)

@@ -151,7 +151,7 @@ class TestValidators(object):
             # Non-string names aren't allowed as names.
             13,
             23.7,
-            100L,
+            100,
             1.0j,
             None,
             True,
@@ -193,6 +193,35 @@ class TestValidators(object):
                 return validators.name_validator(*args, **kwargs)
             call_validator(invalid_value, context={})
 
+    def test_email_validator_with_invalid_value(selfs):
+        invalid_values = [
+            '..test...test..@example.com',
+            'test @example.com',
+            'test@ example.com',
+            'test..test@example.com',
+            'test.test...@example.com',
+            '...test@example.com',
+        ]
+
+        for invalid_value in invalid_values:
+            @raises_Invalid
+            def call_validator(*args, **kwargs):
+                return validators.email_validator(*args, **kwargs)
+            call_validator(invalid_value, context={})
+
+    def test_email_validator_with_valid_value(self):
+        valid_values = [
+            'text@example.com',
+            'test.this@example.com',
+            'test.this@server.example.com',
+        ]
+
+        for valid_value in valid_values:
+            @returns_arg
+            def call_validator(*args, **kwargs):
+                return validators.email_validator(*args, **kwargs)
+            call_validator(valid_value)
+
     def test_name_validator_with_valid_value(self):
         '''If given a valid string name_validator() should do nothing and
         return the string.
@@ -229,7 +258,7 @@ class TestValidators(object):
         non_string_values = [
             13,
             23.7,
-            100L,
+            100,
             1.0j,
             None,
             True,
@@ -583,5 +612,59 @@ class TestExistsValidator(helpers.FunctionalTestBase):
     def test_role_exists_empty(self):
         ctx = self._make_context()
         v = validators.role_exists('', ctx)
+
+
+class TestPasswordValidator(object):
+
+    def test_ok(self):
+        passwords = ['MyPassword1', 'my1Password', '1PasswordMY']
+        key = ('password',)
+
+        @t.does_not_modify_errors_dict
+        def call_validator(*args, **kwargs):
+            return validators.user_password_validator(*args, **kwargs)
+        for password in passwords:
+            errors = factories.validator_errors_dict()
+            errors[key] = []
+            call_validator(key, {key: password}, errors, None)
+
+    def test_too_short(self):
+        password = 'MyPass1'
+        key = ('password',)
+
+        @adds_message_to_errors_dict('Your password must be 8 characters or '
+                                     'longer')
+        def call_validator(*args, **kwargs):
+            return validators.user_password_validator(*args, **kwargs)
+        errors = factories.validator_errors_dict()
+        errors[key] = []
+        call_validator(key, {key: password}, errors, None)
+
+
+class TestUrlValidator(object):
+
+    def test_ok(self):
+        urls = ['http://example.com', 'https://example.com', 'https://example.com/path?test=1&key=2']
+        key = ('url',)
+
+        @t.does_not_modify_errors_dict
+        def call_validator(*args, **kwargs):
+            return validators.url_validator(*args, **kwargs)
+        for url in urls:
+            errors = factories.validator_errors_dict()
+            errors[key] = []
+            call_validator(key, {key: url}, errors, None)
+
+    def test_invalid(self):
+        urls = ['ftp://example.com', 'test123', 'https://example.com]']
+        key = ('url',)
+
+        @adds_message_to_errors_dict('Please provide a valid URL')
+        def call_validator(*args, **kwargs):
+            return validators.url_validator(*args, **kwargs)
+        for url in urls:
+            errors = factories.validator_errors_dict()
+            errors[key] = []
+            call_validator(key, {key: url}, errors, None)
 
 # TODO: Need to test when you are not providing owner_org and the validator queries for the dataset with package_show

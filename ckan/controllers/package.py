@@ -9,6 +9,7 @@ import cgi
 from ckan.common import config
 from paste.deploy.converters import asbool
 import paste.fileapp
+from six import string_types, text_type
 
 import ckan.logic as logic
 import ckan.lib.base as base
@@ -45,7 +46,7 @@ lookup_package_plugin = ckan.lib.plugins.lookup_package_plugin
 
 
 def _encode_params(params):
-    return [(k, v.encode('utf-8') if isinstance(v, basestring) else str(v))
+    return [(k, v.encode('utf-8') if isinstance(v, string_types) else str(v))
             for k, v in params]
 
 
@@ -162,7 +163,8 @@ class PackageController(base.BaseController):
 
         def remove_field(key, value=None, replace=None):
             return h.remove_url_param(key, value=value, replace=replace,
-                                      controller='package', action='search')
+                                      controller='package', action='search',
+                                      alternative_url=package_type)
 
         c.remove_field = remove_field
 
@@ -224,15 +226,29 @@ class PackageController(base.BaseController):
                        'user': c.user, 'for_view': True,
                        'auth_user_obj': c.userobj}
 
-            if package_type and package_type != 'dataset':
+            # Unless changed via config options, don't show other dataset
+            # types any search page. Potential alternatives are do show them
+            # on the default search page (dataset) or on one other search page
+            search_all_type = config.get(
+                'ckan.search.show_all_types', 'dataset')
+            search_all = False
+
+            try:
+                # If the "type" is set to True or False, convert to bool
+                # and we know that no type was specified, so use traditional
+                # behaviour of applying this only to dataset type
+                search_all = asbool(search_all_type)
+                search_all_type = 'dataset'
+            # Otherwise we treat as a string representing a type
+            except ValueError:
+                search_all = True
+
+            if not package_type:
+                package_type = 'dataset'
+
+            if not search_all or package_type != search_all_type:
                 # Only show datasets of this particular type
                 fq += ' +dataset_type:{type}'.format(type=package_type)
-            else:
-                # Unless changed via config options, don't show non standard
-                # dataset types on the default search page
-                if not asbool(
-                        config.get('ckan.search.show_all_types', 'False')):
-                    fq += ' +dataset_type:dataset'
 
             facets = OrderedDict()
 
@@ -242,7 +258,7 @@ class PackageController(base.BaseController):
                 'tags': _('Tags'),
                 'res_format': _('Formats'),
                 'license_id': _('Licenses'),
-                }
+            }
 
             for facet in h.facets():
                 if facet in default_facet_titles:
@@ -280,14 +296,14 @@ class PackageController(base.BaseController):
             )
             c.search_facets = query['search_facets']
             c.page.items = query['results']
-        except SearchQueryError, se:
+        except SearchQueryError as se:
             # User's search parameters are invalid, in such a way that is not
             # achievable with the web interface, so return a proper error to
             # discourage spiders which are the main cause of this.
             log.info('Dataset search query rejected: %r', se.args)
             abort(400, _('Invalid search query: {error_message}')
                   .format(error_message=str(se)))
-        except SearchError, se:
+        except SearchError as se:
             # May be bad input from the user, but may also be more serious like
             # bad code causing a SOLR syntax error, or a problem connecting to
             # SOLR
@@ -295,6 +311,9 @@ class PackageController(base.BaseController):
             c.query_error = True
             c.search_facets = {}
             c.page = h.Page(collection=[])
+        except NotAuthorized:
+            abort(403, _('Not authorized to see this page'))
+
         c.search_facets_limits = {}
         for facet in c.search_facets.keys():
             try:
@@ -354,9 +373,9 @@ class PackageController(base.BaseController):
                 try:
                     date = h.date_str_to_datetime(revision_ref)
                     context['revision_date'] = date
-                except TypeError, e:
+                except TypeError as e:
                     abort(400, _('Invalid revision format: %r') % e.args)
-                except ValueError, e:
+                except ValueError as e:
                     abort(400, _('Invalid revision format: %r') % e.args)
         elif len(split) > 2:
             abort(400, _('Invalid revision format: %r') %
@@ -374,13 +393,12 @@ class PackageController(base.BaseController):
 
         # can the resources be previewed?
         for resource in c.pkg_dict['resources']:
-            # Backwards compatibility with preview interface
-            resource['can_be_previewed'] = self._resource_preview(
-                {'resource': resource, 'package': c.pkg_dict})
-
             resource_views = get_action('resource_view_list')(
                 context, {'id': resource['id']})
             resource['has_views'] = len(resource_views) > 0
+
+            # Backwards compatibility with preview interface
+            resource['can_be_previewed'] = bool(len(resource_views))
 
         package_type = c.pkg_dict['type'] or 'dataset'
         self._setup_template_variables(context, {'id': id},
@@ -390,11 +408,14 @@ class PackageController(base.BaseController):
         try:
             return render(template,
                           extra_vars={'dataset_type': package_type})
-        except ckan.lib.render.TemplateNotFound:
-            msg = _("Viewing {package_type} datasets in {format} format is "
-                    "not supported (template file {file} not found).".format(
-                        package_type=package_type, format=format,
-                        file=template))
+        except ckan.lib.render.TemplateNotFound as e:
+            msg = _(
+                "Viewing datasets of type \"{package_type}\" is "
+                "not supported ({file_!r}).".format(
+                    package_type=package_type,
+                    file_=e.message
+                )
+            )
             abort(404, msg)
 
         assert False, "We should never get here"
@@ -443,14 +464,14 @@ class PackageController(base.BaseController):
                                id=c.pkg_dict['name']),
                 description=_(u'Recent changes to CKAN Dataset: ') +
                 (c.pkg_dict['title'] or ''),
-                language=unicode(i18n.get_lang()),
+                language=text_type(i18n.get_lang()),
             )
             for revision_dict in c.pkg_revisions:
                 revision_date = h.date_str_to_datetime(
                     revision_dict['timestamp'])
                 try:
                     dayHorizon = int(request.params.get('days'))
-                except:
+                except ValueError:
                     dayHorizon = 30
                 dayAge = (datetime.datetime.now() - revision_date).days
                 if dayAge >= dayHorizon:
@@ -499,7 +520,7 @@ class PackageController(base.BaseController):
         except NotAuthorized:
             abort(403, _('Unauthorized to create a package'))
 
-        if context['save'] and not data:
+        if context['save'] and not data and request.method == 'POST':
             return self._save_new(context, package_type=package_type)
 
         data = data or clean_dict(dict_fns.unflatten(tuplize_dict(parse_params(
@@ -543,16 +564,22 @@ class PackageController(base.BaseController):
     def resource_edit(self, id, resource_id, data=None, errors=None,
                       error_summary=None):
 
+        context = {'model': model, 'session': model.Session,
+                   'api_version': 3, 'for_edit': True,
+                   'user': c.user, 'auth_user_obj': c.userobj}
+        data_dict = {'id': id}
+
+        try:
+            check_access('package_update', context, data_dict)
+        except NotAuthorized:
+            abort(403, _('User %r not authorized to edit %s') % (c.user, id))
+
         if request.method == 'POST' and not data:
             data = data or \
                 clean_dict(dict_fns.unflatten(tuplize_dict(parse_params(
                                                            request.POST))))
             # we don't want to include save as it is part of the form
             del data['save']
-
-            context = {'model': model, 'session': model.Session,
-                       'api_version': 3, 'for_edit': True,
-                       'user': c.user, 'auth_user_obj': c.userobj}
 
             data['package_id'] = id
             try:
@@ -561,7 +588,7 @@ class PackageController(base.BaseController):
                     get_action('resource_update')(context, data)
                 else:
                     get_action('resource_create')(context, data)
-            except ValidationError, e:
+            except ValidationError as e:
                 errors = e.error_dict
                 error_summary = e.error_summary
                 return self.resource_edit(id, resource_id, data,
@@ -571,20 +598,12 @@ class PackageController(base.BaseController):
             h.redirect_to(controller='package', action='resource_read', id=id,
                           resource_id=resource_id)
 
-        context = {'model': model, 'session': model.Session,
-                   'api_version': 3, 'for_edit': True,
-                   'user': c.user, 'auth_user_obj': c.userobj}
         pkg_dict = get_action('package_show')(context, {'id': id})
         if pkg_dict['state'].startswith('draft'):
             # dataset has not yet been fully created
             resource_dict = get_action('resource_show')(context,
                                                         {'id': resource_id})
-            fields = ['url', 'resource_type', 'format', 'name', 'description',
-                      'id']
-            data = {}
-            for field in fields:
-                data[field] = resource_dict[field]
-            return self.new_resource(id, data=data)
+            return self.new_resource(id, data=resource_dict)
         # resource is fully created
         try:
             resource_dict = get_action('resource_show')(context,
@@ -647,8 +666,12 @@ class PackageController(base.BaseController):
                 except NotFound:
                     abort(404, _('The dataset {id} could not be found.'
                                  ).format(id=id))
-                if not len(data_dict['resources']):
-                    # no data so keep on page
+                require_resources = asbool(
+                    config.get('ckan.dataset.create_on_ui_requires_resources',
+                               'True')
+                )
+                if require_resources and not len(data_dict['resources']):
+                    # no data and configured to require resource: stay on page
                     msg = _('You must add at least one data resource')
                     # On new templates do not use flash message
 
@@ -675,7 +698,7 @@ class PackageController(base.BaseController):
                     get_action('resource_update')(context, data)
                 else:
                     get_action('resource_create')(context, data)
-            except ValidationError, e:
+            except ValidationError as e:
                 errors = e.error_dict
                 error_summary = e.error_summary
                 return self.new_resource(id, data, errors, error_summary)
@@ -738,7 +761,7 @@ class PackageController(base.BaseController):
                    'user': c.user, 'auth_user_obj': c.userobj,
                    'save': 'save' in request.params}
 
-        if context['save'] and not data:
+        if context['save'] and not data and request.method == 'POST':
             return self._save_edit(id, context, package_type=package_type)
         try:
             c.pkg_dict = get_action('package_show')(dict(context,
@@ -918,17 +941,17 @@ class PackageController(base.BaseController):
                                      package_type=package_type)
         except NotAuthorized:
             abort(403, _('Unauthorized to read package %s') % '')
-        except NotFound, e:
+        except NotFound as e:
             abort(404, _('Dataset not found'))
         except dict_fns.DataError:
             abort(400, _(u'Integrity Error'))
-        except SearchIndexError, e:
+        except SearchIndexError as e:
             try:
-                exc_str = unicode(repr(e.args))
+                exc_str = text_type(repr(e.args))
             except Exception:  # We don't like bare excepts
-                exc_str = unicode(str(e))
+                exc_str = text_type(str(e))
             abort(500, _(u'Unable to add package to search index.') + exc_str)
-        except ValidationError, e:
+        except ValidationError as e:
             errors = e.error_dict
             error_summary = e.error_summary
             if is_an_update:
@@ -966,17 +989,17 @@ class PackageController(base.BaseController):
                                      package_type=package_type)
         except NotAuthorized:
             abort(403, _('Unauthorized to read package %s') % id)
-        except NotFound, e:
+        except NotFound as e:
             abort(404, _('Dataset not found'))
         except dict_fns.DataError:
             abort(400, _(u'Integrity Error'))
-        except SearchIndexError, e:
+        except SearchIndexError as e:
             try:
-                exc_str = unicode(repr(e.args))
+                exc_str = text_type(repr(e.args))
             except Exception:  # We don't like bare excepts
-                exc_str = unicode(str(e))
+                exc_str = text_type(str(e))
             abort(500, _(u'Unable to update search index.') + exc_str)
-        except ValidationError, e:
+        except ValidationError as e:
             errors = e.error_dict
             error_summary = e.error_summary
             return self.edit(name_or_id, data_dict, errors, error_summary)
@@ -1041,7 +1064,12 @@ class PackageController(base.BaseController):
             if request.method == 'POST':
                 get_action('resource_delete')(context, {'id': resource_id})
                 h.flash_notice(_('Resource has been deleted.'))
-                h.redirect_to(controller='package', action='read', id=id)
+                pkg_dict = get_action('package_show')(None, {'id': id})
+                if pkg_dict['state'].startswith('draft'):
+                    h.redirect_to(controller='package', action='new_resource',
+                                  id=id)
+                else:
+                    h.redirect_to(controller='package', action='read', id=id)
             c.resource_dict = get_action('resource_show')(
                 context, {'id': resource_id})
             c.pkg_id = id
@@ -1083,16 +1111,15 @@ class PackageController(base.BaseController):
         except KeyError:
             c.package['isopen'] = False
 
-        # TODO: find a nicer way of doing this
+        # Deprecated: c.datastore_api - use h.action_url instead
         c.datastore_api = '%s/api/action' % \
             config.get('ckan.site_url', '').rstrip('/')
-
-        c.resource['can_be_previewed'] = self._resource_preview(
-            {'resource': c.resource, 'package': c.package})
 
         resource_views = get_action('resource_view_list')(
             context, {'id': resource_id})
         c.resource['has_views'] = len(resource_views) > 0
+
+        c.resource['can_be_previewed'] = bool(len(resource_views))
 
         current_resource_view = None
         view_id = request.GET.get('view_id')
@@ -1414,7 +1441,7 @@ class PackageController(base.BaseController):
         # update resource should tell us early if the user has privilages.
         try:
             check_access('resource_update', context, {'id': resource_id})
-        except NotAuthorized, e:
+        except NotAuthorized as e:
             abort(403, _('User %r not authorized to edit %s') % (c.user, id))
 
         # get resource and package data
@@ -1454,7 +1481,7 @@ class PackageController(base.BaseController):
                     data = get_action('resource_view_update')(context, data)
                 else:
                     data = get_action('resource_view_create')(context, data)
-            except ValidationError, e:
+            except ValidationError as e:
                 # Could break preview if validation error
                 to_preview = False
                 errors = e.error_dict

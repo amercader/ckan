@@ -42,13 +42,11 @@ app_globals_from_config_details = {
         # has been setup in load_environment():
     'ckan.site_id': {},
     'ckan.recaptcha.publickey': {'name': 'recaptcha_publickey'},
-    'ckan.recaptcha.version': {'name': 'recaptcha_version', 'default': '1'},
-    'ckan.template_title_deliminater': {'default': '-'},
+    'ckan.template_title_delimiter': {'default': '-'},
     'ckan.template_head_end': {},
     'ckan.template_footer_end': {},
     'ckan.dumps_url': {},
     'ckan.dumps_format': {},
-    'ofs.impl': {'name': 'ofs_impl'},
     'ckan.homepage_style': {'default': '1'},
 
     # split string
@@ -212,7 +210,7 @@ class _Globals(object):
         self.ckan_version = ckan.__version__
         self.ckan_base_version = re.sub('[^0-9\.]', '', self.ckan_version)
         if self.ckan_base_version == self.ckan_version:
-            self.ckan_doc_version = 'ckan-{0}'.format(self.ckan_version)
+            self.ckan_doc_version = self.ckan_version[:3]
         else:
             self.ckan_doc_version = 'latest'
 

@@ -79,7 +79,7 @@ class DomainObject(object):
 
     def delete(self):
         # stateful objects have this method overridden - see
-        # vmd.base.StatefulObjectMixin
+        # core.StatefulObjectMixin
         self.Session.delete(self)
 
     def purge(self):
@@ -107,7 +107,7 @@ class DomainObject(object):
         for col in table.c:
             try:
                 repr += u' %s=%s' % (col.name, getattr(self, col.name))
-            except Exception, inst:
+            except Exception as inst:
                 repr += u' %s=%s' % (col.name, inst)
 
         repr += '>'

@@ -3,10 +3,10 @@
 '''API functions for adding data to CKAN.'''
 
 import logging
-import mimetypes
 import random
 import re
 from socket import error as socket_error
+import string
 
 import paste.deploy.converters
 from sqlalchemy import func
@@ -60,6 +60,8 @@ def package_create(context, data_dict):
     :param title: the title of the dataset (optional, default: same as
         ``name``)
     :type title: string
+    :param private: If ``True`` creates a private dataset
+    :type private: bool
     :param author: the name of the dataset's author (optional)
     :type author: string
     :param author_email: the email address of the dataset's author (optional)
@@ -118,7 +120,8 @@ def package_create(context, data_dict):
     :param owner_org: the id of the dataset's owning organization, see
         :py:func:`~ckan.logic.action.get.organization_list` or
         :py:func:`~ckan.logic.action.get.organization_list_for_user` for
-        available values (optional)
+        available values. This parameter can be made optional if the config
+        option :ref:`ckan.auth.create_unowned_dataset` is set to ``True``.
     :type owner_org: string
 
     :returns: the newly created dataset (unless 'return_id_only' is set to True
@@ -221,18 +224,14 @@ def package_create(context, data_dict):
     if not context.get('defer_commit'):
         model.repo.commit()
 
-    # need to let rest api create
-    context["package"] = pkg
-    # this is added so that the rest controller can make a new location
-    context["id"] = pkg.id
-    log.debug('Created object %s' % pkg.name)
-
     return_id_only = context.get('return_id_only', False)
 
-    output = context['id'] if return_id_only \
-        else _get_action('package_show')(context, {'id': context['id']})
+    if return_id_only:
+        return pkg.id
 
-    return output
+    return _get_action('package_show')(
+        context.copy(), {'id': pkg.id}
+    )
 
 
 def resource_create(context, data_dict):
@@ -312,9 +311,11 @@ def resource_create(context, data_dict):
         context['use_cache'] = False
         _get_action('package_update')(context, pkg_dict)
         context.pop('defer_commit')
-    except ValidationError, e:
-        errors = e.error_dict['resources'][-1]
-        raise ValidationError(errors)
+    except ValidationError as e:
+        try:
+            raise ValidationError(e.error_dict['resources'][-1])
+        except (KeyError, IndexError):
+            raise ValidationError(e.error_dict)
 
     # Get out resource_id resource from model as it will not appear in
     # package_show until after commit
@@ -391,7 +392,7 @@ def resource_view_create(context, data_dict):
 
     max_order = model.Session.query(
         func.max(model.ResourceView.order)
-        ).filter_by(resource_id=resource_id).first()
+    ).filter_by(resource_id=resource_id).first()
 
     order = 0
     if max_order[0] is not None:
@@ -608,7 +609,7 @@ def member_create(context, data_dict=None):
                               table_id=obj.id,
                               group_id=group.id,
                               state='active')
-
+        member.group = group
     member.capacity = capacity
 
     model.Session.add(member)
@@ -937,8 +938,6 @@ def user_create(context, data_dict):
     :type fullname: string
     :param about: a description of the new user (optional)
     :type about: string
-    :param openid: (optional)
-    :type openid: string
 
     :returns: the newly created user
     :rtype: dictionary
@@ -1018,6 +1017,7 @@ def user_invite(context, data_dict):
     :returns: the newly created user
     :rtype: dictionary
     '''
+    import string
     _check_access('user_invite', context, data_dict)
 
     schema = context.get('schema',
@@ -1032,7 +1032,19 @@ def user_invite(context, data_dict):
         raise NotFound()
 
     name = _get_random_username_from_email(data['email'])
-    password = str(random.SystemRandom().random())
+    # Choose a password. However it will not be used - the invitee will not be
+    # told it - they will need to reset it
+    while True:
+        password = ''.join(random.SystemRandom().choice(
+            string.ascii_lowercase + string.ascii_uppercase + string.digits)
+            for _ in range(12))
+        # Occasionally it won't meet the constraints, so check
+        errors = {}
+        logic.validators.user_password_validator(
+            'password', {'password': password}, errors, None)
+        if not errors:
+            break
+
     data['name'] = name
     data['password'] = password
     data['state'] = ckan.model.State.PENDING
@@ -1081,28 +1093,6 @@ def _get_random_username_from_email(email):
             return name
 
     return cleaned_localpart
-
-
-# Modifications for rest api
-
-def package_create_rest(context, data_dict):
-    _check_access('package_create_rest', context, data_dict)
-    dictized_package = model_save.package_api_to_dict(data_dict, context)
-    dictized_after = _get_action('package_create')(context, dictized_package)
-    pkg = context['package']
-    package_dict = model_dictize.package_to_api(pkg, context)
-    data_dict['id'] = pkg.id
-    return package_dict
-
-
-def group_create_rest(context, data_dict):
-    _check_access('group_create_rest', context, data_dict)
-    dictized_group = model_save.group_api_to_dict(data_dict, context)
-    dictized_after = _get_action('group_create')(context, dictized_group)
-    group = context['group']
-    group_dict = model_dictize.group_to_api(group, context)
-    data_dict['id'] = group.id
-    return group_dict
 
 
 def vocabulary_create(context, data_dict):
@@ -1200,21 +1190,6 @@ def activity_create(context, activity_dict, **kw):
 
     log.debug("Created '%s' activity" % activity.activity_type)
     return model_dictize.activity_dictize(activity, context)
-
-
-def package_relationship_create_rest(context, data_dict):
-    # rename keys
-    key_map = {'id': 'subject',
-               'id2': 'object',
-               'rel': 'type'}
-    # Don't be destructive to enable parameter values for
-    # object and type to override the URL parameters.
-    data_dict = ckan.logic.action.rename_keys(data_dict, key_map,
-                                              destructive=False)
-
-    relationship_dict = _get_action('package_relationship_create')(
-        context, data_dict)
-    return relationship_dict
 
 
 def tag_create(context, data_dict):

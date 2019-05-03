@@ -140,7 +140,7 @@ Adding a new dataset
 
     You may need to be a member of an organization in order to add and edit
     datsets. See the section :ref:`creating_an_organization` below. On
-    http://demo.ckan.org, you can add a dataset without being in an organization,
+    https://demo.ckan.org, you can add a dataset without being in an organization,
     but dataset features relating to authorization and organizations will not be
     available.
 
@@ -465,8 +465,7 @@ The dataset page also has two other tabs:
 
 * *Activity stream* -- see the history of recent changes to the dataset
 
-* *Related items* -- see any links to web pages related to this dataset, or add
-  your own links.
+* *Groups* -- see any group associated with this dataset.
 
 If the dataset is of interest, you can opt to be notified of changes to it by
 using the "Follow" button on the dataset page. See the section

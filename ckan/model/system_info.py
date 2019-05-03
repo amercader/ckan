@@ -8,6 +8,7 @@ For more details, check :doc:`maintaining/configuration`.
 '''
 
 from sqlalchemy import types, Column, Table
+from six import text_type
 
 import vdm.sqlalchemy
 import meta
@@ -22,14 +23,14 @@ system_info_table = Table(
     Column('id', types.Integer(),  primary_key=True, nullable=False),
     Column('key', types.Unicode(100), unique=True, nullable=False),
     Column('value', types.UnicodeText),
+    Column('state', types.UnicodeText, default=core.State.ACTIVE),
 )
 
-vdm.sqlalchemy.make_table_stateful(system_info_table)
 system_info_revision_table = core.make_revisioned_table(system_info_table)
 
 
 class SystemInfo(vdm.sqlalchemy.RevisionedObjectMixin,
-                 vdm.sqlalchemy.StatefulObjectMixin,
+                 core.StatefulObjectMixin,
                  domain_object.DomainObject):
 
     def __init__(self, key, value):
@@ -37,7 +38,7 @@ class SystemInfo(vdm.sqlalchemy.RevisionedObjectMixin,
         super(SystemInfo, self).__init__()
 
         self.key = key
-        self.value = unicode(value)
+        self.value = text_type(value)
 
 
 meta.mapper(SystemInfo, system_info_table,
@@ -76,12 +77,12 @@ def set_system_info(key, value):
     ''' save data in the system_info table '''
     obj = None
     obj = meta.Session.query(SystemInfo).filter_by(key=key).first()
-    if obj and obj.value == unicode(value):
+    if obj and obj.value == text_type(value):
         return
     if not obj:
         obj = SystemInfo(key, value)
     else:
-        obj.value = unicode(value)
+        obj.value = text_type(value)
 
     from ckan.model import repo
     rev = repo.new_revision()

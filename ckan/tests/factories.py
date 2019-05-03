@@ -107,7 +107,7 @@ class User(factory.Factory):
 
     # These are the default params that will be used to create new users.
     fullname = 'Mr. Test User'
-    password = 'pass'
+    password = 'RandomPassword123'
     about = 'Just another test user.'
 
     # Generate a different user name param for each user that gets created.
@@ -211,7 +211,7 @@ class Sysadmin(factory.Factory):
     FACTORY_FOR = ckan.model.User
 
     fullname = 'Mr. Test Sysadmin'
-    password = 'pass'
+    password = 'RandomPassword123'
     about = 'Just another test sysadmin.'
 
     name = factory.Sequence(lambda n: 'test_sysadmin_{0:02d}'.format(n))
@@ -421,3 +421,19 @@ class Vocabulary(factory.Factory):
         if args:
             assert False, "Positional args aren't supported, use keyword args."
         return helpers.call_action('vocabulary_create', **kwargs)
+
+
+class Activity(factory.Factory):
+    '''A factory class for creating CKAN activity objects.'''
+
+    FACTORY_FOR = ckan.model.Activity
+
+    @classmethod
+    def _build(cls, target_class, *args, **kwargs):
+        raise NotImplementedError(".build() isn't supported in CKAN")
+
+    @classmethod
+    def _create(cls, target_class, *args, **kwargs):
+        if args:
+            assert False, "Positional args aren't supported, use keyword args."
+        return helpers.call_action('activity_create', **kwargs)

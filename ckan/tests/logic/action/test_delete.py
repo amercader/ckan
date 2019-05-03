@@ -3,6 +3,7 @@
 import re
 
 import nose.tools
+from six import text_type
 
 import ckan.tests.helpers as helpers
 import ckan.tests.factories as factories
@@ -149,8 +150,8 @@ class TestDeleteTags(object):
         # through in NotFound as unicode.
         try:
             helpers.call_action('tag_delete', id=u'Delta symbol: \u0394')
-        except logic.NotFound, e:
-            assert u'Delta symbol: \u0394' in unicode(e)
+        except logic.NotFound as e:
+            assert u'Delta symbol: \u0394' in text_type(e)
         else:
             assert 0, 'Should have raised NotFound'
 
@@ -241,8 +242,7 @@ class TestGroupPurge(object):
         assert_equals(sorted(
             [gr.name for gr in model.Session.query(model.GroupRevision)]),
             ['child', 'parent'])
-        assert_equals(model.Session.query(model.GroupExtraRevision).all(),
-                      [])
+        # GroupExtra is not revisioned
         # Member is not revisioned
 
         # No Revision objects were purged, in fact 1 is created for the purge
@@ -344,8 +344,7 @@ class TestOrganizationPurge(object):
         assert_equals(sorted(
             [gr.name for gr in model.Session.query(model.GroupRevision)]),
             ['child', 'parent'])
-        assert_equals(model.Session.query(model.GroupExtraRevision).all(),
-                      [])
+        # GroupExtra is not revisioned
         # Member is not revisioned
 
         # No Revision objects were purged, in fact 1 is created for the purge
@@ -451,8 +450,7 @@ class TestDatasetPurge(object):
         assert_equals(model.Session.query(model.PackageRevision).all(), [])
         assert_equals(model.Session.query(model.ResourceRevision).all(), [])
         assert_equals(model.Session.query(model.PackageTagRevision).all(), [])
-        assert_equals(model.Session.query(model.PackageExtraRevision).all(),
-                      [])
+        # PackageExtraRevision is not revisioned
         # Member is not revisioned
 
         # No Revision objects were purged or created

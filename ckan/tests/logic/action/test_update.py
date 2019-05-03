@@ -80,24 +80,12 @@ class TestUpdate(object):
 
         # 1. Setup.
         user = factories.User()
+        user['name'] = 'updated'
 
-        # 2. Call the function that's being tested, once only.
-        # FIXME we have to pass the email address and password to user_update
-        # even though we're not updating those fields, otherwise validation
-        # fails.
-        helpers.call_action('user_update', id=user['name'],
-                            email=user['email'],
-                            password=factories.User.attributes()['password'],
-                            name='updated',
-                            )
-
-        # 3. Make assertions about the return value and/or side-effects.
-        updated_user = helpers.call_action('user_show', id=user['id'])
-        # Note that we check just the field we were trying to update, not the
-        # entire dict, only assert what we're actually testing.
-        assert updated_user['name'] == 'updated'
-
-        # 4. Do nothing else!
+        # 2. Make assertions about the return value and/or side-effects.
+        assert_raises(logic.ValidationError,
+                      helpers.call_action, 'user_update',
+                      **user)
 
     # END-BEFORE
 
@@ -259,7 +247,7 @@ class TestUpdate(object):
         '''Test that the right activity is emitted when updating a user.'''
 
         user = factories.User()
-        before = datetime.datetime.now()
+        before = datetime.datetime.utcnow()
 
         # FIXME we have to pass the email address and password to user_update
         # even though we're not updating those fields, otherwise validation
@@ -267,7 +255,7 @@ class TestUpdate(object):
         helpers.call_action('user_update', id=user['name'],
                             email=user['email'],
                             password=factories.User.attributes()['password'],
-                            name='updated',
+                            fullname='updated full name',
                             )
 
         activity_stream = helpers.call_action('user_activity_list',
@@ -276,7 +264,7 @@ class TestUpdate(object):
         assert latest_activity['activity_type'] == 'changed user'
         assert latest_activity['object_id'] == user['id']
         assert latest_activity['user_id'] == user['id']
-        after = datetime.datetime.now()
+        after = datetime.datetime.utcnow()
         timestamp = datetime_from_string(latest_activity['timestamp'])
         assert timestamp >= before and timestamp <= after
 
@@ -310,7 +298,7 @@ class TestUpdate(object):
         helpers.call_action('user_update', context={'schema': schema},
                             id=user['name'], email=user['email'],
                             password=factories.User.attributes()['password'],
-                            name='updated',
+                            fullname='updated full name',
                             )
 
         # Since we passed user['name'] to user_update as the 'id' param,
@@ -325,7 +313,6 @@ class TestUpdate(object):
 
         params = {
             'id': user['id'],
-            'name': 'updated_name',
             'fullname': 'updated full name',
             'about': 'updated about',
             # FIXME: We shouldn't have to put email here since we're not
@@ -339,7 +326,6 @@ class TestUpdate(object):
         helpers.call_action('user_update', **params)
 
         updated_user = helpers.call_action('user_show', id=user['id'])
-        assert updated_user['name'] == 'updated_name'
         assert updated_user['fullname'] == 'updated full name'
         assert updated_user['about'] == 'updated about'
 
@@ -351,7 +337,6 @@ class TestUpdate(object):
 
         params = {
             'id': user['id'],
-            'name': 'updated_name',
             'fullname': 'updated full name',
             'about': 'updated about',
             'email': user['email'],
@@ -369,7 +354,6 @@ class TestUpdate(object):
 
         params = {
             'id': user['id'],
-            'name': 'updated_name',
             'fullname': 'updated full name',
             'about': 'updated about',
             'email': user['email'],
@@ -391,7 +375,6 @@ class TestUpdate(object):
 
         params = {
             'id': user['id'],
-            'name': 'updated_name',
             'fullname': 'updated full name',
             'about': 'updated about',
             'email': user['email'],
@@ -503,6 +486,185 @@ class TestUpdate(object):
         assert_equals(
             helpers.call_action('group_show', id='unchanging')['type'],
             'group')
+
+
+class TestDatasetUpdate(helpers.FunctionalTestBase):
+
+    def test_missing_id(self):
+        user = factories.User()
+        dataset = factories.Dataset(
+            user=user)
+
+        assert_raises(
+            logic.ValidationError, helpers.call_action,
+            'package_update'
+        )
+
+    def test_name(self):
+        user = factories.User()
+        dataset = factories.Dataset(
+            user=user)
+
+        dataset_ = helpers.call_action(
+            'package_update',
+            id=dataset['id'],
+            name='new-name',
+        )
+
+        assert_equals(dataset_['name'], 'new-name')
+        assert_equals(
+            helpers.call_action('package_show', id=dataset['id'])['name'],
+            'new-name')
+
+    def test_title(self):
+        user = factories.User()
+        dataset = factories.Dataset(
+            user=user)
+
+        dataset_ = helpers.call_action(
+            'package_update',
+            id=dataset['id'],
+            title='New Title',
+        )
+
+        assert_equals(dataset_['title'], 'New Title')
+        assert_equals(
+            helpers.call_action('package_show', id=dataset['id'])['title'],
+            'New Title')
+
+    def test_extras(self):
+        user = factories.User()
+        dataset = factories.Dataset(
+            user=user)
+
+        dataset_ = helpers.call_action(
+            'package_update',
+            id=dataset['id'],
+            extras=[{'key': u'original media',
+                     'value': u'"book"'}],
+        )
+
+        assert_equals(dataset_['extras'][0]['key'], 'original media')
+        assert_equals(dataset_['extras'][0]['value'], '"book"')
+        dataset_ = helpers.call_action('package_show', id=dataset['id'])
+        assert_equals(dataset_['extras'][0]['key'], 'original media')
+        assert_equals(dataset_['extras'][0]['value'], '"book"')
+
+    def test_license(self):
+        user = factories.User()
+        dataset = factories.Dataset(
+            user=user)
+
+        dataset_ = helpers.call_action(
+            'package_update',
+            id=dataset['id'],
+            license_id='other-open',
+        )
+
+        assert_equals(dataset_['license_id'], 'other-open')
+        dataset_ = helpers.call_action('package_show', id=dataset['id'])
+        assert_equals(dataset_['license_id'], 'other-open')
+
+    def test_notes(self):
+        user = factories.User()
+        dataset = factories.Dataset(
+            user=user)
+
+        dataset_ = helpers.call_action(
+            'package_update',
+            id=dataset['id'],
+            notes='some notes',
+        )
+
+        assert_equals(dataset_['notes'], 'some notes')
+        dataset_ = helpers.call_action('package_show', id=dataset['id'])
+        assert_equals(dataset_['notes'], 'some notes')
+
+    def test_resources(self):
+        user = factories.User()
+        dataset = factories.Dataset(
+            user=user)
+
+        dataset_ = helpers.call_action(
+            'package_update',
+            id=dataset['id'],
+            resources=[
+                {'alt_url': u'alt123',
+                 'description': u'Full text.',
+                 'somekey': 'somevalue',  # this is how to do resource extras
+                 'extras': {u'someotherkey': u'alt234'},  # this isnt
+                 'format': u'plain text',
+                 'hash': u'abc123',
+                 'position': 0,
+                 'url': u'http://datahub.io/download/'},
+                {'description': u'Index of the novel',
+                 'format': u'JSON',
+                 'position': 1,
+                 'url': u'http://datahub.io/index.json'}],
+        )
+
+        resources_ = dataset_['resources']
+        assert_equals(resources_[0]['alt_url'], 'alt123')
+        assert_equals(resources_[0]['description'], 'Full text.')
+        assert_equals(resources_[0]['somekey'], 'somevalue')
+        assert 'extras' not in resources_[0]
+        assert 'someotherkey' not in resources_[0]
+        assert_equals(resources_[0]['format'], 'plain text')
+        assert_equals(resources_[0]['hash'], 'abc123')
+        assert_equals(resources_[0]['position'], 0)
+        assert_equals(resources_[0]['url'], 'http://datahub.io/download/')
+        assert_equals(resources_[1]['description'], 'Index of the novel')
+        assert_equals(resources_[1]['format'], 'JSON')
+        assert_equals(resources_[1]['url'], 'http://datahub.io/index.json')
+        assert_equals(resources_[1]['position'], 1)
+        resources_ = helpers.call_action(
+            'package_show', id=dataset['id'])['resources']
+        assert_equals(resources_[0]['alt_url'], 'alt123')
+        assert_equals(resources_[0]['description'], 'Full text.')
+        assert_equals(resources_[0]['somekey'], 'somevalue')
+        assert 'extras' not in resources_[0]
+        assert 'someotherkey' not in resources_[0]
+        assert_equals(resources_[0]['format'], 'plain text')
+        assert_equals(resources_[0]['hash'], 'abc123')
+        assert_equals(resources_[0]['position'], 0)
+        assert_equals(resources_[0]['url'], 'http://datahub.io/download/')
+        assert_equals(resources_[1]['description'], 'Index of the novel')
+        assert_equals(resources_[1]['format'], 'JSON')
+        assert_equals(resources_[1]['url'], 'http://datahub.io/index.json')
+        assert_equals(resources_[1]['position'], 1)
+
+    def test_tags(self):
+        user = factories.User()
+        dataset = factories.Dataset(
+            user=user)
+
+        dataset_ = helpers.call_action(
+            'package_update',
+            id=dataset['id'],
+            tags=[{'name': u'russian'}, {'name': u'tolstoy'}],
+        )
+
+        tag_names = sorted([tag_dict['name']
+                            for tag_dict in dataset_['tags']])
+        assert_equals(tag_names, ['russian', 'tolstoy'])
+        dataset_ = helpers.call_action('package_show', id=dataset['id'])
+        tag_names = sorted([tag_dict['name']
+                            for tag_dict in dataset_['tags']])
+        assert_equals(tag_names, ['russian', 'tolstoy'])
+
+    def test_return_id_only(self):
+        user = factories.User()
+        dataset = factories.Dataset(
+            user=user)
+
+        updated_dataset = helpers.call_action(
+            'package_update',
+            id=dataset['id'],
+            notes='Test',
+            context={'return_id_only': True},
+        )
+
+        assert_equals(updated_dataset, dataset['id'])
 
 
 class TestUpdateSendEmailNotifications(object):
@@ -661,7 +823,16 @@ class TestResourceUpdate(object):
             model.repo.rebuild_db()
 
     @classmethod
+    def setup_class(cls):
+        if not p.plugin_loaded('image_view'):
+            p.load('image_view')
+        if not p.plugin_loaded('recline_view'):
+            p.load('recline_view')
+
+    @classmethod
     def teardown_class(cls):
+        p.unload('image_view')
+        p.unload('recline_view')
         helpers.reset_db()
 
     def test_url_only(self):
@@ -898,10 +1069,12 @@ class TestResourceUpdate(object):
         ''')
         update_resource = TestResourceUpdate.FakeFileStorage(update_file, 'update_test')
 
-        res_update = helpers.call_action('resource_update',
-                                         id=resource['id'],
-                                         url='http://localhost',
-                                         upload=update_resource)
+        # Mock url_for as using a test request context interferes with the FS mocking
+        with mock.patch('ckan.lib.helpers.url_for'):
+            res_update = helpers.call_action('resource_update',
+                                             id=resource['id'],
+                                             url='http://localhost',
+                                             upload=update_resource)
 
         org_mimetype = resource.pop('mimetype')
         upd_mimetype = res_update.pop('mimetype')
@@ -941,10 +1114,13 @@ class TestResourceUpdate(object):
         ''')
         test_resource = TestResourceUpdate.FakeFileStorage(test_file, 'test.json')
         dataset = factories.Dataset()
-        resource = factories.Resource(package=dataset,
-                                      url='http://localhost',
-                                      name='Test',
-                                      upload=test_resource)
+
+        # Mock url_for as using a test request context interferes with the FS mocking
+        with mock.patch('ckan.lib.helpers.url_for'):
+            resource = factories.Resource(package=dataset,
+                                          url='http://localhost',
+                                          name='Test',
+                                          upload=test_resource)
 
         update_file = StringIO.StringIO()
         update_file.write('''
@@ -955,10 +1131,11 @@ class TestResourceUpdate(object):
         ''')
         update_resource = TestResourceUpdate.FakeFileStorage(update_file, 'update_test.csv')
 
-        res_update = helpers.call_action('resource_update',
-                                         id=resource['id'],
-                                         url='http://localhost',
-                                         upload=update_resource)
+        with mock.patch('ckan.lib.helpers.url_for'):
+            res_update = helpers.call_action('resource_update',
+                                             id=resource['id'],
+                                             url='http://localhost',
+                                             upload=update_resource)
 
         org_mimetype = resource.pop('mimetype')
         upd_mimetype = res_update.pop('mimetype')
@@ -1017,10 +1194,13 @@ class TestResourceUpdate(object):
         ''')
         test_resource = TestResourceUpdate.FakeFileStorage(test_file, 'test.json')
         dataset = factories.Dataset()
-        resource = factories.Resource(package=dataset,
-                                      url='http://localhost',
-                                      name='Test',
-                                      upload=test_resource)
+
+        # Mock url_for as using a test request context interferes with the FS mocking
+        with mock.patch('ckan.lib.helpers.url_for'):
+            resource = factories.Resource(package=dataset,
+                                          url='http://localhost',
+                                          name='Test',
+                                          upload=test_resource)
 
         update_file = StringIO.StringIO()
         update_file.write('''
@@ -1031,15 +1211,140 @@ class TestResourceUpdate(object):
         ''')
         update_resource = TestResourceUpdate.FakeFileStorage(update_file, 'update_test.csv')
 
-        res_update = helpers.call_action('resource_update',
-                                         id=resource['id'],
-                                         url='http://localhost',
-                                         upload=update_resource)
+        with mock.patch('ckan.lib.helpers.url_for'):
+            res_update = helpers.call_action('resource_update',
+                                             id=resource['id'],
+                                             url='http://localhost',
+                                             upload=update_resource)
 
         org_size = int(resource.pop('size'))  # 669 bytes
         upd_size = int(res_update.pop('size'))  # 358 bytes
 
         assert org_size > upd_size
+
+    def test_extras(self):
+        user = factories.User()
+        dataset = factories.Dataset(
+            user=user,
+            resources=[dict(
+                format=u'json',
+                url=u'http://datahub.io/',
+            )])
+
+        resource = helpers.call_action(
+            'resource_update',
+            id=dataset['resources'][0]['id'],
+            somekey='somevalue',  # this is how to do resource extras
+            extras={u'someotherkey': u'alt234'},  # this isnt
+            format=u'plain text',
+            url=u'http://datahub.io/download/',
+        )
+
+        assert_equals(resource['somekey'], 'somevalue')
+        assert 'extras' not in resource
+        assert 'someotherkey' not in resource
+        resource = helpers.call_action(
+            'package_show', id=dataset['id'])['resources'][0]
+        assert_equals(resource['somekey'], 'somevalue')
+        assert 'extras' not in resource
+        assert 'someotherkey' not in resource
+
+    @helpers.change_config('ckan.views.default_views', 'image_view recline_view')
+    def test_resource_format_update(self):
+        dataset = factories.Dataset()
+
+        # Create resource without format
+        resource = factories.Resource(package=dataset,
+                                      url='http://localhost',
+                                      name='Test')
+        res_views = helpers.call_action(
+            'resource_view_list',
+            id=resource['id'])
+
+        assert_equals(len(res_views), 0)
+
+        # Update resource with format
+        resource = helpers.call_action(
+            'resource_update',
+            id=resource['id'],
+            format='CSV')
+
+        # Format changed
+        assert_equals(resource['format'], 'CSV')
+
+        res_views = helpers.call_action(
+            'resource_view_list',
+            id=resource['id'])
+
+        # View for resource is created
+        assert_equals(len(res_views), 1)
+
+        second_resource = factories.Resource(
+            package=dataset,
+            url='http://localhost',
+            name='Test2',
+            format='CSV')
+
+        res_views = helpers.call_action(
+            'resource_view_list',
+            id=second_resource['id'])
+
+        assert_equals(len(res_views), 1)
+
+        second_resource = helpers.call_action(
+            'resource_update',
+            id=second_resource['id'],
+            format='PNG')
+
+        # Format changed
+        assert_equals(second_resource['format'], 'PNG')
+
+        res_views = helpers.call_action(
+            'resource_view_list',
+            id=second_resource['id'])
+
+        assert_equals(len(res_views), 2)
+
+        third_resource = factories.Resource(
+            package=dataset,
+            url='http://localhost',
+            name='Test2')
+
+        res_views = helpers.call_action(
+            'resource_view_list',
+            id=third_resource['id'])
+
+        assert_equals(len(res_views), 0)
+
+        third_resource = helpers.call_action(
+            'resource_update',
+            id=third_resource['id'],
+            format='Test format')
+
+        # Format added
+        assert_equals(third_resource['format'], 'Test format')
+
+        res_views = helpers.call_action(
+            'resource_view_list',
+            id=third_resource['id'])
+
+        # No view created, cause no such format
+        assert_equals(len(res_views), 0)
+
+        third_resource = helpers.call_action(
+            'resource_update',
+            id=third_resource['id'],
+            format='CSV')
+
+        # Format changed
+        assert_equals(third_resource['format'], 'CSV')
+
+        res_views = helpers.call_action(
+            'resource_view_list',
+            id=third_resource['id'])
+
+        # View is created
+        assert_equals(len(res_views), 1)
 
 
 class TestConfigOptionUpdate(object):
@@ -1260,3 +1565,45 @@ class TestBulkOperations(object):
             .all()
         for revision in revisions:
             eq_(revision.state, 'deleted')
+
+
+class TestDashboardMarkActivitiesOld(helpers.FunctionalTestBase):
+    def test_mark_as_old_some_activities_by_a_followed_user(self):
+        # do some activity that will show up on user's dashboard
+        user = factories.User()
+        # now some activity that is "new" because it is by a followed user
+        followed_user = factories.User()
+        helpers.call_action(
+            'follow_user', context={'user': user['name']}, **followed_user)
+        dataset = factories.Dataset(user=followed_user)
+        dataset['title'] = 'Dataset with changed title'
+        helpers.call_action(
+            'package_update', context={'user': followed_user['name']}, **dataset)
+        eq_(helpers.call_action('dashboard_new_activities_count',
+                                context={'user': user['id']}),
+            3)
+        activities = helpers.call_action('dashboard_activity_list',
+                                         context={'user': user['id']})
+        eq_([(activity['activity_type'], activity['is_new'])
+            for activity in activities[::-1]],
+            [('new user', False),
+             ('new user', True),
+             ('new package', True),
+             ('changed package', True),
+             ])
+
+        helpers.call_action('dashboard_mark_activities_old',
+                            context={'user': user['name']})
+
+        eq_(helpers.call_action('dashboard_new_activities_count',
+                                context={'user': user['id']}),
+            0)
+        activities = helpers.call_action('dashboard_activity_list',
+                                         context={'user': user['id']})
+        eq_([(activity['activity_type'], activity['is_new'])
+            for activity in activities[::-1]],
+            [('new user', False),
+             ('new user', False),
+             ('new package', False),
+             ('changed package', False),
+             ])
