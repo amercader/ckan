@@ -3,7 +3,7 @@
 import datetime
 import logging
 import re
-from urllib import urlencode
+from six.moves.urllib.parse import urlencode
 
 from pylons.i18n import get_lang
 from six import string_types, text_type
@@ -466,8 +466,12 @@ def read(group_type, is_organization, id=None, limit=20):
     # if the user specified a group id, redirect to the group name
     if data_dict['id'] == group_dict['id'] and \
             data_dict['id'] != group_dict['name']:
-        return h.redirect_to(u'{}.read'.format(group_type),
-                             id=group_dict['name'])
+
+        url_with_name = h.url_for(u'{}.read'.format(group_type),
+                                  id=group_dict['name'])
+
+        return h.redirect_to(
+            h.add_url_param(alternative_url=url_with_name))
 
     # TODO: Remove
     # ckan 2.9: Adding variables that were removed from c object for

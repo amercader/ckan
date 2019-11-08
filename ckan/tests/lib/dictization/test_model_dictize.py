@@ -109,7 +109,6 @@ class TestGroupListDictize:
         member = model.Member(group=group_obj, table_id=tag.id,
                               table_name='tag')
         model.Session.add(member)
-        model.repo.new_revision()
         model.Session.commit()
         group_list = model.Session.query(model.Group).filter_by().all()
         context = {'model': model, 'session': model.Session}
@@ -256,7 +255,9 @@ class TestGroupDictize:
     def test_group_dictize_with_package_count(self):
         # group_list_dictize calls it like this by default
         group_ = factories.Group()
+        other_group_ = factories.Group()
         factories.Dataset(groups=[{'name': group_['name']}])
+        factories.Dataset(groups=[{'name': other_group_['name']}])
         group_obj = model.Session.query(model.Group).filter_by().first()
         context = {'model': model, 'session': model.Session,
                    'dataset_counts': model_dictize.get_group_dataset_counts()
@@ -295,7 +296,9 @@ class TestGroupDictize:
     def test_group_dictize_for_org_with_package_count(self):
         # group_list_dictize calls it like this by default
         org_ = factories.Organization()
+        other_org_ = factories.Organization()
         factories.Dataset(owner_org=org_['id'])
+        factories.Dataset(owner_org=other_org_['id'])
         org_obj = model.Session.query(model.Group).filter_by().first()
         context = {'model': model, 'session': model.Session,
                    'dataset_counts': model_dictize.get_group_dataset_counts()
@@ -620,7 +623,6 @@ class TestActivityDictize(object):
         activity = factories.Activity(
             user_id=user['id'],
             object_id=dataset['id'],
-            revision_id=None,
             activity_type='new package',
             data={
                 'package': copy.deepcopy(dataset),
@@ -642,7 +644,6 @@ class TestActivityDictize(object):
         activity = factories.Activity(
             user_id=user['id'],
             object_id=dataset['id'],
-            revision_id=None,
             activity_type='new package',
             data={
                 'package': copy.deepcopy(dataset),

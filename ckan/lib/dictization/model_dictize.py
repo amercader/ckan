@@ -12,7 +12,8 @@ The basic recipe is to call:
 which builds the dictionary by iterating over the table columns.
 '''
 import datetime
-import urlparse
+
+from six.moves.urllib.parse import urlsplit
 
 from ckan.common import config
 from sqlalchemy.sql import select
@@ -115,7 +116,7 @@ def resource_dictize(res, context):
                                     resource_id=res.id,
                                     filename=cleaned_name,
                                     qualified=True)
-    elif resource['url'] and not urlparse.urlsplit(url).scheme and not context.get('for_edit'):
+    elif resource['url'] and not urlsplit(url).scheme and not context.get('for_edit'):
         resource['url'] = u'http://' + url.lstrip('/')
     return resource
 
@@ -140,8 +141,6 @@ def package_dictize(pkg, context):
     model = context['model']
     assert not (context.get('revision_id') or
                 context.get('revision_date')), \
-        'Revision functionality is moved to migrate_package_activity'
-    assert not isinstance(pkg, model.PackageRevision), \
         'Revision functionality is moved to migrate_package_activity'
     execute = _execute
     # package
@@ -180,7 +179,7 @@ def package_dictize(pkg, context):
     # extras - no longer revisioned, so always provide latest
     extra = model.package_extra_table
     q = select([extra]).where(extra.c.package_id == pkg.id)
-    result = _execute(q, extra, context)
+    result = execute(q, extra, context)
     result_dict["extras"] = extras_list_dictize(result, context)
 
     # groups
@@ -313,9 +312,9 @@ def group_dictize(group, context,
             }
 
             if group_.is_organization:
-                q['fq'] = 'owner_org:"{0}"'.format(group_.id)
+                q['fq'] = '+owner_org:"{0}"'.format(group_.id)
             else:
-                q['fq'] = 'groups:"{0}"'.format(group_.name)
+                q['fq'] = '+groups:"{0}"'.format(group_.name)
 
             # Allow members of organizations to see private datasets.
             if group_.is_organization:
@@ -496,7 +495,6 @@ def user_dictize(user, context, include_password_hash=False):
 
     result_dict['display_name'] = user.display_name
     result_dict['email_hash'] = user.email_hash
-    result_dict['number_of_edits'] = user.number_of_edits()
     result_dict['number_created_packages'] = user.number_created_packages(
         include_private_and_draft=context.get(
             'count_private_and_draft_datasets', False))
@@ -557,7 +555,6 @@ def tag_to_api(tag, context):
 
 
 def resource_dict_to_api(res_dict, package_id, context):
-    res_dict.pop("revision_id")
     res_dict.pop("state")
     res_dict["package_id"] = package_id
 

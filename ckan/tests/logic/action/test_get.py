@@ -2,6 +2,9 @@
 
 import datetime
 import copy
+import json
+from pprint import pprint
+import re
 
 import nose.tools
 
@@ -26,6 +29,7 @@ assert_raises = nose.tools.assert_raises
 class TestPackageShow(helpers.FunctionalTestBase):
 
     def test_package_show(self):
+        # simple dataset, simple checks
         dataset1 = factories.Dataset()
 
         dataset2 = helpers.call_action('package_show', id=dataset1['id'])
@@ -33,6 +37,131 @@ class TestPackageShow(helpers.FunctionalTestBase):
         eq(dataset2['name'], dataset1['name'])
         missing_keys = set(('title', 'groups')) - set(dataset2.keys())
         assert not missing_keys, missing_keys
+
+    def test_package_show_with_full_dataset(self):
+        # an full dataset
+        org = factories.Organization()
+        group = factories.Group()
+        dataset1 = factories.Dataset(
+            resources=[{'url': 'http://example.com/image.png', 'format': 'png',
+                        'name': 'Image 1'}],
+            tags=[{u'name': u'science'}],
+            extras=[{u'key': u'subject', u'value': u'science'}],
+            groups=[{u'id': group['id']}],
+            owner_org=org['id'],
+        )
+        dataset2 = helpers.call_action('package_show', id=dataset1['id'])
+
+        # checking the whole dataset is a bit brittle as a test, but it
+        # documents what the package_dict is clearly and tracks how it changes
+        # as CKAN changes over time.
+
+        # fix values which change every time you run this test
+        def replace_uuid(dict_, key):
+            assert key in dict_
+            dict_[key] = u'<SOME-UUID>'
+
+        def replace_datetime(dict_, key):
+            assert key in dict_
+            dict_[key] = u'2019-05-24T15:52:30.123456'
+
+        def replace_number_suffix(dict_, key):
+            # e.g. "Test Dataset 23" -> "Test Dataset "
+            assert key in dict_
+            dict_[key] = re.sub(r'\d+$', 'num', dict_[key])
+
+        replace_uuid(dataset2, 'id')
+        replace_uuid(dataset2, 'creator_user_id')
+        replace_uuid(dataset2, 'owner_org')
+        replace_number_suffix(dataset2, 'name')
+        replace_datetime(dataset2, 'metadata_created')
+        replace_datetime(dataset2, 'metadata_modified')
+        replace_uuid(dataset2['groups'][0], 'id')
+        replace_number_suffix(dataset2['groups'][0], 'name')
+        replace_number_suffix(dataset2['groups'][0], 'title')
+        replace_number_suffix(dataset2['groups'][0], 'display_name')
+        replace_uuid(dataset2['organization'], 'id')
+        replace_number_suffix(dataset2['organization'], 'name')
+        replace_number_suffix(dataset2['organization'], 'title')
+        replace_datetime(dataset2['organization'], 'created')
+        replace_uuid(dataset2['resources'][0], 'id')
+        replace_uuid(dataset2['resources'][0], 'package_id')
+        replace_number_suffix(dataset2['resources'][0], 'name')
+        replace_datetime(dataset2['resources'][0], 'created')
+        replace_uuid(dataset2['tags'][0], 'id')
+
+        pprint(dataset2)
+        nose.tools.assert_equal.__self__.maxDiff = None
+        nose.tools.assert_equal(dataset2, {
+            u'author': None,
+            u'author_email': None,
+            u'creator_user_id': u'<SOME-UUID>',
+            u'extras': [{u'key': u'subject', u'value': u'science'}],
+            u'groups': [{
+                u'description': u'A test description for this test group.',
+                u'display_name': u'Test Group num',
+                u'id': u'<SOME-UUID>',
+                u'image_display_url': u'',
+                u'name': u'test_group_num',
+                u'title': u'Test Group num'}],
+            u'id': u'<SOME-UUID>',
+            u'isopen': False,
+            u'license_id': None,
+            u'license_title': None,
+            u'maintainer': None,
+            u'maintainer_email': None,
+            u'metadata_created': u'2019-05-24T15:52:30.123456',
+            u'metadata_modified': u'2019-05-24T15:52:30.123456',
+            u'name': u'test_dataset_num',
+            u'notes': u'Just another test dataset.',
+            u'num_resources': 1,
+            u'num_tags': 1,
+            u'organization': {
+                u'approval_status': u'approved',
+                u'created': u'2019-05-24T15:52:30.123456',
+                u'description': u'Just another test organization.',
+                u'id': u'<SOME-UUID>',
+                u'image_url': u'http://placekitten.com/g/200/100',
+                u'is_organization': True,
+                u'name': u'test_org_num',
+                u'state': u'active',
+                u'title': u'Test Organization',
+                u'type': u'organization'},
+            u'owner_org': u'<SOME-UUID>',
+            u'private': False,
+            u'relationships_as_object': [],
+            u'relationships_as_subject': [],
+            u'resources': [{
+                u'cache_last_updated': None,
+                u'cache_url': None,
+                u'created': u'2019-05-24T15:52:30.123456',
+                u'description': u'',
+                u'format': u'PNG',
+                u'hash': u'',
+                u'id': u'<SOME-UUID>',
+                u'last_modified': None,
+                u'mimetype': None,
+                u'mimetype_inner': None,
+                u'name': u'Image num',
+                u'package_id': u'<SOME-UUID>',
+                u'position': 0,
+                u'resource_type': None,
+                u'size': None,
+                u'state': u'active',
+                u'url': u'http://example.com/image.png',
+                u'url_type': None}],
+            u'state': u'active',
+            u'tags': [{
+                u'display_name': u'science',
+                u'id': u'<SOME-UUID>',
+                u'name': u'science',
+                u'state': u'active',
+                u'vocabulary_id': None}],
+            u'title': u'Test Dataset',
+            u'type': u'dataset',
+            u'url': None,
+            u'version': None}
+        )
 
     def test_package_show_with_custom_schema(self):
         dataset1 = factories.Dataset()
@@ -167,7 +296,6 @@ class TestGroupList(helpers.FunctionalTestBase):
 
     def _create_bulk_groups(self, name, count):
         from ckan import model
-        model.repo.new_revision()
         groups = [model.Group(name='{}_{}'.format(name, i))
                   for i in range(count)]
         model.Session.add_all(groups)
@@ -496,7 +624,6 @@ class TestOrganizationList(helpers.FunctionalTestBase):
 
     def _create_bulk_orgs(self, name, count):
         from ckan import model
-        model.repo.new_revision()
         orgs = [model.Group(name='{}_{}'.format(name, i), is_organization=True,
                             type='organization')
                 for i in range(count)]
@@ -625,7 +752,6 @@ class TestUserList(helpers.FunctionalTestBase):
         assert got_user['created'] == user['created']
         assert got_user['about'] == user['about']
         assert got_user['sysadmin'] == user['sysadmin']
-        assert got_user['number_of_edits'] == 0
         assert got_user['number_created_packages'] == 0
         assert 'password' not in got_user
         assert 'reset_key' not in got_user
@@ -647,7 +773,6 @@ class TestUserList(helpers.FunctionalTestBase):
         assert len(got_users) == 1
         got_user = got_users[0]
         assert got_user['number_created_packages'] == 1
-        assert got_user['number_of_edits'] == 2
 
     def test_user_list_excludes_deleted_users(self):
 
@@ -697,7 +822,6 @@ class TestUserShow(helpers.FunctionalTestBase):
         assert got_user['created'] == user['created']
         assert got_user['about'] == user['about']
         assert got_user['sysadmin'] == user['sysadmin']
-        assert got_user['number_of_edits'] == 0
         assert got_user['number_created_packages'] == 0
         assert 'password' not in got_user
         assert 'reset_key' not in got_user
@@ -1020,7 +1144,6 @@ class TestPackageSearch(helpers.FunctionalTestBase):
 
     def _create_bulk_datasets(self, name, count):
         from ckan import model
-        model.repo.new_revision()
         pkgs = [model.Package(name='{}_{}'.format(name, i))
                 for i in range(count)]
         model.Session.add_all(pkgs)
@@ -2058,91 +2181,6 @@ class TestTagList(helpers.FunctionalTestBase):
             helpers.call_action, 'tag_list', vocabulary_id='does-not-exist')
 
 
-class TestRevisionList(helpers.FunctionalTestBase):
-
-    @classmethod
-    def setup_class(cls):
-        super(TestRevisionList, cls).setup_class()
-        helpers.reset_db()
-
-    # Error cases
-
-    def test_date_instead_of_revision(self):
-        nose.tools.assert_raises(
-            logic.NotFound,
-            helpers.call_action,
-            'revision_list',
-            since_id='2010-01-01T00:00:00')
-
-    def test_date_invalid(self):
-        nose.tools.assert_raises(
-            logic.ValidationError,
-            helpers.call_action,
-            'revision_list',
-            since_time='2010-02-31T00:00:00')
-
-    def test_revision_doesnt_exist(self):
-        nose.tools.assert_raises(
-            logic.NotFound,
-            helpers.call_action,
-            'revision_list',
-            since_id='1234')
-
-    def test_sort_param_not_valid(self):
-        nose.tools.assert_raises(
-            logic.ValidationError,
-            helpers.call_action,
-            'revision_list',
-            sort='invalid')
-
-    # Normal usage
-
-    @classmethod
-    def _create_revisions(cls, num_revisions):
-        from ckan import model
-        rev_ids = []
-        for i in xrange(num_revisions):
-            rev = model.repo.new_revision()
-            rev.id = text_type(i)
-            model.Session.commit()
-            rev_ids.append(rev.id)
-        return rev_ids
-
-    def test_all_revisions(self):
-        rev_ids = self._create_revisions(2)
-        revs = helpers.call_action('revision_list')
-        # only test the 2 newest revisions, since the system creates one at
-        # start-up.
-        eq(revs[:2], rev_ids[::-1])
-
-    def test_revisions_since_id(self):
-        self._create_revisions(4)
-        revs = helpers.call_action('revision_list', since_id='1')
-        eq(revs, ['3', '2'])
-
-    def test_revisions_since_time(self):
-        from ckan import model
-        self._create_revisions(4)
-
-        rev1 = model.Session.query(model.Revision).get('1')
-        revs = helpers.call_action('revision_list',
-                                   since_time=rev1.timestamp.isoformat())
-        eq(revs, ['3', '2'])
-
-    def test_revisions_returned_are_limited(self):
-        self._create_revisions(55)
-        revs = helpers.call_action('revision_list', since_id='1')
-        eq(len(revs), 50)  # i.e. limited to 50
-        eq(revs[0], '54')
-        eq(revs[-1], '5')
-
-    def test_sort_asc(self):
-        self._create_revisions(4)
-        revs = helpers.call_action('revision_list', since_id='1',
-                                   sort='time_asc')
-        eq(revs, ['2', '3'])
-
-
 class TestMembersList():
 
     def setup(self):
@@ -2380,7 +2418,7 @@ class TestActivityShow(helpers.FunctionalTestBase):
         dataset = factories.Dataset()
         user = factories.User()
         activity = factories.Activity(
-            user_id=user['id'], object_id=dataset['id'], revision_id=None,
+            user_id=user['id'], object_id=dataset['id'],
             activity_type='new package',
             data={
                 'package': copy.deepcopy(dataset),
@@ -2399,7 +2437,7 @@ class TestActivityShow(helpers.FunctionalTestBase):
         dataset = factories.Dataset()
         user = factories.User()
         activity = factories.Activity(
-            user_id=user['id'], object_id=dataset['id'], revision_id=None,
+            user_id=user['id'], object_id=dataset['id'],
             activity_type='new package',
             data={
                 'package': copy.deepcopy(dataset),
@@ -2644,7 +2682,7 @@ class TestPackageActivityList(helpers.FunctionalTestBase):
         from ckan import model
         objs = [
             model.Activity(
-                user_id=None, object_id=dataset['id'], revision_id=None,
+                user_id=None, object_id=dataset['id'],
                 activity_type=None, data=None)
             for i in range(count)]
         model.Session.add_all(objs)
@@ -2863,7 +2901,7 @@ class TestUserActivityList(helpers.FunctionalTestBase):
         from ckan import model
         objs = [
             model.Activity(
-                user_id=user['id'], object_id=None, revision_id=None,
+                user_id=user['id'], object_id=None,
                 activity_type=None, data=None)
             for i in range(count)]
         model.Session.add_all(objs)
@@ -3059,7 +3097,7 @@ class TestGroupActivityList(helpers.FunctionalTestBase):
         from ckan import model
         objs = [
             model.Activity(
-                user_id=None, object_id=group['id'], revision_id=None,
+                user_id=None, object_id=group['id'],
                 activity_type=None, data=None)
             for i in range(count)]
         model.Session.add_all(objs)
@@ -3261,7 +3299,7 @@ class TestOrganizationActivityList(helpers.FunctionalTestBase):
         from ckan import model
         objs = [
             model.Activity(
-                user_id=None, object_id=org['id'], revision_id=None,
+                user_id=None, object_id=org['id'],
                 activity_type=None, data=None)
             for i in range(count)]
         model.Session.add_all(objs)
@@ -3404,7 +3442,7 @@ class TestRecentlyChangedPackagesActivityList(helpers.FunctionalTestBase):
         from ckan import model
         objs = [
             model.Activity(
-                user_id=None, object_id=None, revision_id=None,
+                user_id=None, object_id=None,
                 activity_type='new_package', data=None)
             for i in range(count)]
         model.Session.add_all(objs)
@@ -3492,7 +3530,7 @@ class TestDashboardActivityList(helpers.FunctionalTestBase):
         from ckan import model
         objs = [
             model.Activity(
-                user_id=user['id'], object_id=None, revision_id=None,
+                user_id=user['id'], object_id=None,
                 activity_type=None, data=None)
             for i in range(count)]
         model.Session.add_all(objs)

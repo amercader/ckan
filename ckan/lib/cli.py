@@ -23,6 +23,7 @@ from six.moves.urllib.parse import urljoin, urlparse
 from six.moves.urllib.request import urlopen
 
 import sqlalchemy as sa
+
 import routes
 import paste.script
 from paste.registry import Registry
@@ -36,7 +37,7 @@ import ckan.include.rjsmin as rjsmin
 import ckan.include.rcssmin as rcssmin
 import ckan.plugins as p
 from ckan.common import config
-
+from ckan.common import asbool
 # This is a test Flask request context to be used internally.
 # Do not use it!
 _cli_test_request_context = None
@@ -110,6 +111,8 @@ def user_add(args):
     for arg in args[1:]:
         try:
             field, value = arg.split('=', 1)
+            if field == 'sysadmin':
+                value = asbool(value)
             data_dict[field] = value
         except ValueError:
             raise ValueError(
@@ -351,7 +354,8 @@ class ManageDb(CkanCommand):
     def command(self):
         cmd = self.args[0]
 
-        self._load_config(cmd!='upgrade')
+        self._load_config(cmd != 'upgrade')
+
         import ckan.model as model
         import ckan.lib.search as search
 
@@ -375,60 +379,17 @@ class ManageDb(CkanCommand):
             if self.verbose:
                 print('Cleaning DB: SUCCESS')
         elif cmd == 'upgrade':
-            if len(self.args) > 1:
-                model.repo.upgrade_db(self.args[1])
-            else:
-                model.repo.upgrade_db()
+            model.repo.upgrade_db(*self.args[1:])
+        elif cmd == 'downgrade':
+            model.repo.downgrade_db(*self.args[1:])
         elif cmd == 'version':
             self.version()
         elif cmd == 'create-from-model':
             model.repo.create_db()
             if self.verbose:
                 print('Creating DB: SUCCESS')
-        elif cmd == 'migrate-filestore':
-            self.migrate_filestore()
         else:
             error('Command %s not recognized' % cmd)
-
-    def migrate_filestore(self):
-        from ckan.model import Session
-        import requests
-        from ckan.lib.uploader import ResourceUpload
-        results = Session.execute("select id, revision_id, url from resource "
-                                  "where resource_type = 'file.upload' "
-                                  "and (url_type <> 'upload' or url_type is null)"
-                                  "and url like '%storage%'")
-        for id, revision_id, url in results:
-            response = requests.get(url, stream=True)
-            if response.status_code != 200:
-                print("failed to fetch %s (code %s)" % (url,
-                                                        response.status_code))
-                continue
-            resource_upload = ResourceUpload({'id': id})
-            assert resource_upload.storage_path, "no storage configured aborting"
-
-            directory = resource_upload.get_directory(id)
-            filepath = resource_upload.get_path(id)
-            try:
-                os.makedirs(directory)
-            except OSError as e:
-                ## errno 17 is file already exists
-                if e.errno != 17:
-                    raise
-
-            with open(filepath, 'wb+') as out:
-                for chunk in response.iter_content(1024):
-                    if chunk:
-                        out.write(chunk)
-
-            Session.execute("update resource set url_type = 'upload'"
-                            "where id = :id", {'id': id})
-            Session.execute("update resource_revision set url_type = 'upload'"
-                            "where id = :id and "
-                            "revision_id = :revision_id",
-                            {'id': id, 'revision_id': revision_id})
-            Session.commit()
-            print("Saved url %s" % url)
 
     def version(self):
         from ckan.model import Session
@@ -545,7 +506,7 @@ Default is false.''')
 
     def rebuild_fast(self):
         ###  Get out config but without starting pylons environment ####
-        conf = self._get_config()
+        conf = _get_config()
 
         ### Get ids using own engine, otherwise multiprocess will balk
         db_url = conf['sqlalchemy.url']
@@ -686,8 +647,10 @@ class Sysadmin(CkanCommand):
                                       (prompts for password and email if not
                                       supplied).
                                       Field can be: apikey
-                                                    password
                                                     email
+                                                    fullname
+                                                    name (this will be the username)
+                                                    password
       sysadmin remove USERNAME      - removes user from sysadmins
     '''
 
@@ -773,8 +736,10 @@ class UserCmd(CkanCommand):
                                       - add a user (prompts for email and
                                         password if not supplied).
                                         Field can be: apikey
-                                                      password
                                                       email
+                                                      fullname
+                                                      name (this will be the username)
+                                                      password
       user setpass USERNAME           - set user password (prompts)
       user remove USERNAME            - removes user from users
       user search QUERY               - searches for a user name
@@ -939,7 +904,6 @@ class DatasetCmd(CkanCommand):
         dataset = self._get_dataset(dataset_ref)
         old_state = dataset.state
 
-        rev = model.repo.new_revision()
         dataset.delete()
         model.repo.commit_and_remove()
         dataset = self._get_dataset(dataset_ref)
