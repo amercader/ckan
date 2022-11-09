@@ -1,7 +1,7 @@
 version: '3'
 
 services:
-  app:
+  ckan:
     build:
       context: ..
       dockerfile: .devcontainer/Dockerfile
@@ -21,7 +21,6 @@ services:
     command: sleep infinity
 
     # Runs app on the same network as the database container, allows "forwardPorts" in devcontainer.json function.
-    network_mode: service:db
 
     # Uncomment the next line to use a non-root user for all processes.
     # user: vscode
@@ -38,9 +37,21 @@ services:
       POSTGRES_USER: ckan_default
       POSTGRES_DB: ckan_default
       POSTGRES_PASSWORD: pass
-
+    network_mode: service:ckan
     # Add "forwardPorts": ["5432"] to **devcontainer.json** to forward PostgreSQL locally.
     # (Adding the "ports" property to this file will not forward from a Codespace.)
+
+  solr:
+    container_name: solr
+    image: ckan/ckan-solr:2.9-solr8
+    network_mode: service:ckan
+    volumes:
+      - solr_data:/opt/solr/server/solr/ckan/data/index
+
+  redis:
+    network_mode: service:ckan
+    container_name: redis
+    image: redis:alpine
 
 volumes:
   postgres-data:
