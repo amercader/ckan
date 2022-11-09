@@ -44,6 +44,14 @@
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	"forwardPorts": [5000, 5432, 8983, 6379],
 
+	// Open in browser
+    "portsAttributes": {
+       "5000": {
+         "label": "CKAN",
+         "onAutoForward": "openPreview"
+       }
+     },
+
 	// Use 'postCreateCommand' to run commands after the container is created.
 	"onCreateCommand": "./.devcontainer/setup.sh",
 	"postAttachCommand": "ckan run",
