@@ -1,5 +1,3 @@
-pip install --user -r requirements.txt
-pip install --user -r dev-requirements.txt
 python setup.py develop --user
 ckan generate config ckan.ini
 mkdir /workspace/data
