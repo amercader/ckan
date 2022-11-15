@@ -8,14 +8,14 @@
 	// Set *default* container specific settings.json values on container create.
 	"settings": {
 		"sqltools.connections": [{
-			"name": "Container database",
+			"name": "CKAN PostgreSQL DB",
 			"driver": "PostgreSQL",
 			"previewLimit": 50,
 			"server": "localhost",
 			"port": 5432,
-			"database": "postgres",
-			"username": "postgres",
-			"password": "postgres"
+			"database": "ckan_default",
+			"username": "ckan_default",
+			"password": "pass"
 		}],
 		"python.pythonPath": "/usr/local/bin/python",
 		"python.languageServer": "Pylance",
