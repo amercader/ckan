@@ -46,7 +46,7 @@ services:
     image: ckan/ckan-solr:2.9-solr8
     network_mode: service:ckan
     volumes:
-      - solr-data:/opt/solr/server/solr/ckan/data/index
+      - solr-data:/var/solr
 
   redis:
     network_mode: service:ckan
