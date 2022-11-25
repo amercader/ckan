@@ -63,7 +63,10 @@
 	"customizations": {
 		"codespaces": {
 		  "openFiles": [
-			".devcontainer/README_codespaces.md"
+		    "ckan.ini"
+          ],
+		  "openPreview": [
+            ".devcontainer/README_codespaces.md"
 		  ]
 		}
 	}
