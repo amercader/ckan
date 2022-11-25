@@ -11,6 +11,13 @@ ckan config-tool ckan.ini ckan.storage_path=/workspace/data
 # Set up site URL
 ckan config-tool ckan.ini ckan.site_url=https://$CODESPACE_NAME-5000.$GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN
 
+# Init DB
+ckan db init
+
+# Create sysadmin user
+ckan user add ckan_admin email=admin@example.com password=test1234
+ckan sysadmin add ckan_admin
+
 # Set up DataStore + DataPusher
 ckan config-tool ckan.ini \
     ckan.datastore.write_url=postgresql://ckan_default:pass@localhost/datastore_default \
@@ -18,10 +25,4 @@ ckan config-tool ckan.ini \
     ckan.datapusher.url=http://localhost:8800 \
     "ckan.plugins=activity datastore datapusher datatables_view"
 ckan datastore set-permissions | psql $(grep ckan.datastore.write_url ckan.ini | awk '{print $3}')
-
-# Init DB
-ckan db init
-
-# Create sysadmin user
-ckan user add ckan_admin email=admin@example.com password=test1234
-ckan sysadmin add ckan_admin
+ckan config-tool ckan.ini "ckan.datapusher.api_token=$(ckan user token add ckan_admin datapusher | tail -n 1 | tr -d '\t')"
