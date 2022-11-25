@@ -42,7 +42,7 @@
 	],
 	
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	"forwardPorts": [5000, 5432, 8983, 6379, 8800],
+	"forwardPorts": [5000, 5432, 8983, 6379],
 
 	// Open in browser
     "portsAttributes": {
@@ -55,7 +55,10 @@
 	// Use 'postCreateCommand' to run commands after the container is created.
 	"onCreateCommand": "pip install --user -r requirements.txt && pip install --user -r dev-requirements.txt",
 	"postCreateCommand": "./.devcontainer/setup.sh",
-	"postAttachCommand": "ckan run",
+	"postAttachCommand": {
+        "server": "ckan run",
+        "worker": "ckan jobs worker"
+    },
 
 	// Comment out connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
 	"remoteUser": "vscode",
