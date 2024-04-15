@@ -20,6 +20,9 @@ jobs:
           github_token: ${{ secrets.BACKPORT_ACTION_PAT }}
           label_pattern: "^Backport ([^ ]+)$"
           merge_commits: skip
+  backport-labels:
+    name: Backport failed labels
+    runs-on: ubuntu-latest
     if: >
       # TODO: Change user id
       (
