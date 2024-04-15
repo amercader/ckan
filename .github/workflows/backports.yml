@@ -1,7 +1,9 @@
 name: Backport merged pull request
 on:
   pull_request_target:
-    types: [closed, edited]
+    types: [closed]
+  issue_comment:
+    types: [created]
 permissions:
   contents: write # so it can comment
   pull-requests: write # so it can create pull requests
