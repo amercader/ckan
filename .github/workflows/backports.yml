@@ -25,8 +25,8 @@ jobs:
   backport-labels:
     name: Backport failed labels
     runs-on: ubuntu-latest
+    # TODO: Change user id
     if: >
-      # TODO: Change user id
       (
         github.event_name == 'issue_comment' &&
         github.event.issue.pull_request &&
