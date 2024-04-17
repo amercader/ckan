@@ -43,7 +43,7 @@ jobs:
             ### Details
             |     |     |
             | --- | --- |
-            | Original pull request | #${pull_number} ([${pull_title}](https://github.com/ckan/ckan/pull/${pull_number)) |
+            | Original pull request | #${pull_number} ([${pull_title}](https://github.com/ckan/ckan/pull/${pull_number})) |
             | Original author | @${pull_author} |
             | Target branch | **[${target_branch}](https://github.com/ckan/ckan/tree/${target_branch})** |
 
