@@ -44,7 +44,7 @@ jobs:
         with:
           # Token to authenticate requests to GitHub
           github_token: ${{ secrets.BACKPORT_ACTION_PAT }}
-          label_pattern: "^Backport ([^ ]+)$"
+          label_pattern: "^Backport (?!pending)([^ ]+)$"
           merge_commits: skip
   backport-labels:
     name: Backport failed labels
