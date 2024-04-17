@@ -43,9 +43,9 @@ jobs:
             ### Details
             |     |     |
             | --- | --- |
-            | Original pull request | ${pull_number} [${pull_title}](https://github.com/ckan/ckan/pull/${pull_number) |
-            | Original author | ${pull_author} |
-            | Target branch | ${target_branch} |
+            | Original pull request | #${pull_number} ([${pull_title}](https://github.com/ckan/ckan/pull/${pull_number)) |
+            | Original author | @${pull_author} |
+            | Target branch | **[${target_branch}](https://github.com/ckan/ckan/tree/${target_branch})** |
 
             Please make sure that all relevant checks pass before merging it.
   backport-labels:
