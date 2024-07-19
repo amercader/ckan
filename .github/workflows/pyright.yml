@@ -24,7 +24,7 @@ jobs:
         run: npm ci
       - name: Check pyright version
         run: |
-          npm show pyright
+          npm list pyright
           grep pyright package.json
           grep pyright package-lock.json
       - name: Check types
