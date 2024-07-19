@@ -23,6 +23,9 @@ jobs:
       - name: Install node deps
         run: npm ci
       - name: Check pyright version
-        run: npm show pyright
+        run: |
+          npm show pyright
+          grep pyright package.json
+          grep pyright package-lock.json
       - name: Check types
         run: npx pyright
