@@ -22,5 +22,7 @@ jobs:
         run: pip install -r requirements.txt -r dev-requirements.txt -e.
       - name: Install node deps
         run: npm ci
+      - name: Check pyright version
+        run: npm show pyright
       - name: Check types
         run: npx pyright
