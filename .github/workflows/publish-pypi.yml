@@ -50,15 +50,23 @@ jobs:
 
   publish-to-testpypi:
     name: Publish Python distribution on TestPyPI
-    # Publish to Test PyPI when a pull request is merged
-    #if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
+    # Publish to Test PyPI when a pull request is mergedo
+    if: github.ref == 'refs/heads/master'
     needs:
     - build
     runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://test.pypi.org/p/ckan
+    permissions:
+      id-token: write
     steps:
-    - name: Dump GitHub context
-      env:
-        GITHUB_CONTEXT: ${{ toJson(github) }}
-      run: |
-        echo "$GITHUB_CONTEXT"      
-
+    - name: Download all the dists
+      uses: actions/download-artifact@v3
+      with:
+        name: python-package-distributions
+        path: dist/
+    - name: Publish distribution to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/
