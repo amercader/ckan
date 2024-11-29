@@ -34,7 +34,7 @@ jobs:
   publish-to-testpypi:
     name: Publish Python distribution on TestPyPI
     # Publish to Test PyPI when a pull request is merged to master
-	if: github.event.pull_request.merged == true && github.ref == 'refs/heads/master'
+    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/master'
     needs:
     - build
     runs-on: ubuntu-latest
