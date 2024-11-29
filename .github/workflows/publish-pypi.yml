@@ -56,7 +56,7 @@ jobs:
     - build
     runs-on: ubuntu-latest
     environment:
-      name: pypi
+      name: test-pypi
       url: https://test.pypi.org/p/ckan
     permissions:
       id-token: write
