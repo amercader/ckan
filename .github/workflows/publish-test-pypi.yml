@@ -17,6 +17,7 @@ jobs:
       with:
         python-version: "3.9"
     - name: Add timestamp to version number
+      run: |
       TIMESTAMP=$(date +"%Y%m%d%H%M")
       sed -E -i 's/__version__ = "(.*)"$/__version__ = '"\1-.post$TIMESTAMP"'/' ckan/__init__.py
     - name: Install pypa/build
