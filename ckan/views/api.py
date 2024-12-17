@@ -4,6 +4,7 @@ import os
 import logging
 import html
 import io
+import datetime
 
 from flask import Blueprint, make_response
 import six
@@ -18,7 +19,9 @@ from ckan.lib.i18n import get_locales_from_config
 
 from ckan.lib.navl.dictization_functions import DataError
 from ckan.logic import get_action, ValidationError, NotFound, NotAuthorized
-from ckan.lib.search import SearchError, SearchIndexError, SearchQueryError
+from ckan.lib.search import (
+    SearchError, SearchIndexError, SearchQueryError, SolrConnectionError
+)
 
 
 log = logging.getLogger(__name__)
@@ -37,6 +40,12 @@ API_MAX_VERSION = 3
 
 
 api = Blueprint(u'api', __name__, url_prefix=u'/api')
+
+
+def _json_serial(obj):
+    if isinstance(obj, (datetime.datetime, datetime.date)):
+        return obj.isoformat()
+    raise TypeError(u"Unhandled Object")
 
 
 def _finish(status_int, response_data=None,
@@ -66,6 +75,7 @@ def _finish(status_int, response_data=None,
         if content_type == u'json':
             response_msg = json.dumps(
                 response_data,
+                default=_json_serial,   # handle datetime objects
                 for_json=True)  # handle objects with for_json methods
         else:
             response_msg = response_data
@@ -341,6 +351,12 @@ def action(logic_function, ver=API_DEFAULT_VERSION):
             u'__type': u'Search Index Error',
             u'message': u'Unable to add package to search index: %s' %
                        str(e)}
+        return_dict[u'success'] = False
+        return _finish(500, return_dict, content_type=u'json')
+    except SolrConnectionError:
+        return_dict[u'error'] = {
+            u'__type': u'Search Connection Error',
+            u'message': u'Unable to connect to the search server'}
         return_dict[u'success'] = False
         return _finish(500, return_dict, content_type=u'json')
     except Exception as e:

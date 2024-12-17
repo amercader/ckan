@@ -9,6 +9,131 @@ Changelog
 
 .. towncrier release notes start
 
+
+v.2.9.12 2024-08-21
+===================
+
+Bugfixes
+--------
+- `CVE-2024-43371 <https://github.com/ckan/ckan/security/advisories/GHSA-g9ph-j5vj-f8wm>`_: SSRF prevention mechanisms. Added support for the :ref:`ckan.download_proxy` setting in the `Resource Proxy <https://docs.ckan.org/en/latest/maintaining/data-viewer.html#resource-proxy>`_ plugin.
+- `CVE-2024-41674 <https://github.com/ckan/ckan/security/advisories/GHSA-2rqw-cfhc-35fh>`_: fixed Solr credentials leak via error message in ``package_search`` action.
+- `CVE-2024-41675 <https://github.com/ckan/ckan/security/advisories/GHSA-r3jc-vhf4-6v32>`_: fixed XSS vector in DataTables view.
+
+
+v.2.9.11 2024-03-13
+===================
+
+Minor changes
+-------------
+- Define allowed alternative Solr query parsers via the :ref:`ckan.search.solr_allowed_query_parsers`
+  config option (`#8053 <https://github.com/ckan/ckan/pull/8053>`_). Note that the 2.9 version of this
+  patch does not use pyparsing to parse the local parameters string, so some limitations are in place,
+  mainly that no quotes are allowed in the local paramaters definition.
+- Get default formats for DataStore views from config (`#8095 <https://github.com/ckan/ckan/pull/8095>`_)
+
+Bugfixes
+--------
+- `CVE-2024-27097 <https://github.com/ckan/ckan/security/advisories/GHSA-8g38-3m6v-232j>`_: fixed
+  potential log injection in reset user endpoint.
+- Fixed Octet Streaming for Datastore Dump requests. (`#7899 <https://github.com/ckan/ckan/pull/7899>`_)
+- Fix Password Reset Keys with multiple accounts (`#8079 <https://github.com/ckan/ckan/pull/8079>`_)
+- Detect XLSX mimetypes correctly in uploader (`#8088 <https://github.com/ckan/ckan/pull/8088>`_)
+
+
+v.2.9.10 2023-12-13
+===================
+
+Bugfixes
+--------
+
+- `CVE-2023-50248 <https://github.com/ckan/ckan/security/advisories/GHSA-7fgc-89cx-w8j5>`_: fix potential
+  out of memory error when submitting the dataset form with a specially-crafted field.
+- Update resource datastore_active with a single statement (`#7833 <https://github.com/ckan/ckan/pull/7833>`_)
+- Fix downloading datastore resources as json with null values in json columns
+  (`#7545 <https://github.com/ckan/ckan/pull/7545>`_)
+- Fix errors when running the `ckan db upgrade` command (`#7681
+  <https://github.com/ckan/ckan/pull/7681>`_)
+- Fix ``deprecated`` decorator (`#7939
+  <https://github.com/ckan/ckan/pull/7939>`_)
+- Changed dataset query to check for ``+state:`` in the ``fq_list`` as well as the
+  `fq` parameter before forcing ``state:active`` (`#7905
+  <https://github.com/ckan/ckan/pull/7905>`_)
+
+v.2.9.9 2023-05-24
+==================
+
+Bugfixes
+--------
+
+- `CVE-2023-32321 <https://github.com/ckan/ckan/security/advisories/GHSA-446m-hmmm-hm8m>`_: fix
+  potential path traversal, remote code execution, information disclosure and
+  DOS vulnerabilities via crafted resource ids.
+- Names are now quoted in From and To addresses in emails, meaning that site titles with
+  commas no longer break email clients. (`#7508 <https://github.com/ckan/ckan/pull/7508>`_)
+
+Migration notes
+---------------
+- The default storage backend for the session data used by the Beaker library
+  uses the Python ``pickle`` module, which is considered unsafe. While there is
+  no direct known vulnerability using this vector, a safer alternative is to
+  store the session data in the `client-side cookie <https://beaker.readthedocs.io/en/latest/sessions.html#cookie-based>`_.
+  This will probably be the default behaviour in future CKAN versions::
+
+    # ckan.ini
+
+    beaker.session.type = cookie
+    beaker.session.data_serializer = json
+    # Use a long, random string for this setting
+    beaker.session.validate_key = CHANGE_ME
+
+    beaker.session.httponly = True
+    beaker.session.secure = True
+    beaker.session.samesite = Lax
+    # or Strict, depending on your setup
+
+  .. note:: You might need to install an additional library that can provide AES encryption, e.g. ``pip install cryptography``
+
+
+v.2.9.8 2023-02-15
+==================
+
+Major changes
+-------------
+
+- Disable public registration of users by default (`#7210
+  <https://github.com/ckan/ckan/pull/7210>`_)
+- Restrict user and group/org image upload formats by default (`#7210
+  <https://github.com/ckan/ckan/pull/7210>`_)
+
+
+Minor changes
+-------------
+
+- Add dev containers / GitHub Codespaces config for CKAN 2.9 (See the `documentation <https://github.com/ckan/ckan/wiki/CKAN-in-GitHub-Codespaces>`_
+- Add new group command: ``clean``.
+  Add ``clean users`` command to delete users containing images with formats
+  not supported in ``ckan.upload.user.mimetypes`` config option (`#7241
+  <https://github.com/ckan/ckan/pull/7241>`_)
+- Set the ``resource`` blueprint to not auto register. (`#7374
+  <https://github.com/ckan/ckan/pull/7374>`_)
+- ``prepare_dataset_blueprint``: support dataset type (`#7031
+  <https://github.com/ckan/ckan/pull/7031>`_)
+- Add ``--quiet`` option to ``ckan user token add`` command to mak easier to
+  integrate with automated scripts (`#7217
+  <https://github.com/ckan/ckan/pull/7217>`_)
+
+Bugfixes
+--------
+- Fix ``package_update`` performance (`#7219 <https://github.com/ckan/ckan/pull/7219>`_)
+- Fix ``_()`` function override (`#7232 <https://github.com/ckan/ckan/pull/7232>`_)
+- Fix 404 when selecting the same date in the changes view (`#7192 <https://github.com/ckan/ckan/pull/7192>`_)
+- Enable DateTime to be returned through Actions, allowing ``datapusher_status`` to
+  be accessed through the API. (`#7110
+  <https://github.com/ckan/ckan/pull/7110>`_)
+- Fixed broken organization delete form (`#7150
+  <https://github.com/ckan/ckan/pull/7150>`_)
+
+
 v.2.9.7 2022-10-26
 ==================
 
